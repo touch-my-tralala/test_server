@@ -3,6 +3,12 @@
 
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <iostream>
+#include <QDebug>
+#include <QString>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QJsonParseError>
 
 
 class Server: public QObject
@@ -11,9 +17,13 @@ class Server: public QObject
 private:
     QTcpServer *server;
     QByteArray data;
+    QJsonDocument jsonDoc;
+    QJsonParseError jsonErr;
+
 
 private:
     void sendToClient(QTcpSocket *sock);
+    void jsonParse(QJsonDocument *doc);
 
 public:
     Server(quint16 port);

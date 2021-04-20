@@ -1,7 +1,4 @@
 #include "server.h"
-#include <iostream>
-#include <QDebug>
-#include <QString>
 
 Server::Server(quint16 port)
 {
@@ -13,13 +10,13 @@ Server::Server(quint16 port)
     }else{
         qDebug() << "Server listening port " << port;
     }
-//    connect(server, SIGNAL(newConnection()),
-//            this, SLOT(slotNewConnection()));
     connect(server, &QTcpServer::newConnection,
             this, &Server::slotNewConnection);
 }
 
-Server::~Server(){};
+Server::~Server(){
+
+}
 
 void Server::slotNewConnection(){
     QTcpSocket* clientSocket = server->nextPendingConnection();
@@ -32,9 +29,19 @@ void Server::slotNewConnection(){
 }
 
 void Server:: slotReadClient(){
-    QTcpSocket *clientSocket = (QTcpSocket*)sender();
-    auto data = QString::fromUtf8(clientSocket->readAll()).trimmed();
-    qDebug() << data;
+    QTcpSocket *clientSocket = static_cast<QTcpSocket*>(sender());
+//    auto data = QString::fromUtf8(clientSocket->readAll()).trimmed();
+    auto jdata = QJsonDocument::fromJson(clientSocket->readAll(), &jsonErr);
+    if(jsonErr.errorString() == "no error occured"){
+        this->jsonParse(&jdata);
+    }else{
+        qDebug() << "Json format error " << jsonErr.errorString();
+    }
+
+}
+
+void Server::jsonParse(QJsonDocument *doc){
+    qDebug() << "Receive message is " << doc;
 }
 
 void Server::sendToClient(QTcpSocket *sock){
