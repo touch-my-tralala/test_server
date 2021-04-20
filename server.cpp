@@ -2,6 +2,7 @@
 
 Server::Server(quint16 port)
 {
+    QSettings *settings = new QSettings(); // Не понял как делать правильно
     server = new QTcpServer(this);
     if(!server->listen(QHostAddress::Any, port)){
         qDebug() << "Error";
@@ -15,7 +16,7 @@ Server::Server(quint16 port)
 }
 
 Server::~Server(){
-
+    // надо удалить settings? или затереть через nullptr?
 }
 
 void Server::slotNewConnection(){
