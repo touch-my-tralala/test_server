@@ -3,9 +3,9 @@
 
 #include <QTcpServer>
 #include <QTcpSocket>
-#include <QtWidgets>
 
-class Server: public QObject //QWidget
+
+class Server: public QObject
 {
     Q_OBJECT
 private:

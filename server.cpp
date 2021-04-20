@@ -5,7 +5,6 @@
 
 Server::Server(quint16 port)
 {
-    qDebug() << "Constructor";
     server = new QTcpServer(this);
     if(!server->listen(QHostAddress::Any, port)){
         qDebug() << "Error";
