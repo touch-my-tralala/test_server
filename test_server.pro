@@ -28,4 +28,5 @@ HEADERS += \
     server.h
 
 DISTFILES += \
-    init.ini
+    init.ini \
+    test.ini

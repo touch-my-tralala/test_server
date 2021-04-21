@@ -10,12 +10,16 @@
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QSettings>
+#include <QDir>
 
 
 class Server: public QObject
 {
     Q_OBJECT
 private:
+    QStringList userList;
+    quint16 port;
+    quint8 maxUsers;
     QTcpServer *server;
     QByteArray data;
     QJsonDocument jsonDoc;
@@ -23,11 +27,12 @@ private:
 
 
 private:
+    void iniParse(QString fname);
     void sendToClient(QTcpSocket *sock);
     void jsonParse(QJsonDocument *doc);
 
 public:
-    Server(quint16 port);
+    Server();
     ~Server();
 
 public slots:

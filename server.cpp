@@ -1,22 +1,43 @@
 #include "server.h"
 
-Server::Server(quint16 port)
+
+
+Server::Server()
 {
-    QSettings *settings = new QSettings(); // Не понял как делать правильно
-    server = new QTcpServer(this);
-    if(!server->listen(QHostAddress::Any, port)){
-        qDebug() << "Error";
-        server->close();
-        return;
-    }else{
-        qDebug() << "Server listening port " << port;
-    }
-    connect(server, &QTcpServer::newConnection,
-            this, &Server::slotNewConnection);
+    Server::iniParse("init.ini");
+    qDebug() << "port=" << this->port;
+    qDebug() << "max_user=" << this->maxUsers;
+    QStringList::const_iterator i;
+        for(i=this->userList.constBegin(); i != this->userList.constEnd(); ++i){
+            qDebug() << *i;
+        }
+
+
+
+//    server = new QTcpServer(this);
+//    if(!server->listen(QHostAddress::Any, port)){
+//        qDebug() << "Error";
+//        server->close();
+//        return;
+//    }else{
+//        qDebug() << "Server listening port " << port;
+//    }
+//    connect(server, &QTcpServer::newConnection,
+//            this, &Server::slotNewConnection);
 }
 
 Server::~Server(){
     // надо удалить settings? или затереть через nullptr?
+    // надо закрыть сервер?
+}
+
+void Server::iniParse(QString fname){
+    QSettings sett(QDir::currentPath() + "/" + fname, QSettings::IniFormat);
+    sett.setIniCodec("UTF-8");
+    this->port = sett.value("SERVER_SETTINGS/port", 9999).toInt();
+    this->maxUsers = sett.value("SERVER_SETTINGS/max_user", 5).toInt();
+    sett.beginGroup("USER_LIST");
+    this->userList = sett.childKeys();
 }
 
 void Server::slotNewConnection(){
