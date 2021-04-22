@@ -11,6 +11,7 @@
 #include <QJsonParseError>
 #include <QSettings>
 #include <QDir>
+#include <QSharedPointer>
 
 
 class Server: public QObject
@@ -20,7 +21,7 @@ private:
     QStringList userList;
     quint16 port;
     quint8 maxUsers;
-    QTcpServer *server;
+    QSharedPointer< QTcpServer > *server;
     QByteArray data;
     QJsonDocument jsonDoc;
     QJsonParseError jsonErr;

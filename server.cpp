@@ -11,19 +11,19 @@ Server::Server()
         for(i=this->userList.constBegin(); i != this->userList.constEnd(); ++i){
             qDebug() << *i;
         }
+//    Не понимаю как это использовать правильно. Так как сейчас выглядит как полная хуита.
+    QSharedPointer<QTcpServer> test (new QTcpServer(this));
+    server = &test; // почему тут не надо использовать this?
 
-
-
-//    server = new QTcpServer(this);
-//    if(!server->listen(QHostAddress::Any, port)){
-//        qDebug() << "Error";
-//        server->close();
-//        return;
-//    }else{
-//        qDebug() << "Server listening port " << port;
-//    }
-//    connect(server, &QTcpServer::newConnection,
-//            this, &Server::slotNewConnection);
+    if(!server->data()->listen(QHostAddress::Any, port)){
+        qDebug() << "Error";
+        server->data()->close();
+        return;
+    }else{
+        qDebug() << "Server listening port " << port;
+    }
+    connect(server->data(), &QTcpServer::newConnection,
+            this, &Server::slotNewConnection);
 }
 
 Server::~Server(){
@@ -41,7 +41,7 @@ void Server::iniParse(QString fname){
 }
 
 void Server::slotNewConnection(){
-    QTcpSocket* clientSocket = server->nextPendingConnection();
+    QTcpSocket* clientSocket = this->server->data()->nextPendingConnection(); // ?????
     qDebug() << "New connection";
     connect(clientSocket, &QTcpSocket::disconnected,
             clientSocket, &QTcpSocket::deleteLater);
