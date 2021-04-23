@@ -4,25 +4,20 @@
 
 Server::Server()
 {
-    Server::iniParse("init.ini");
-    qDebug() << "port=" << this->port;
-    qDebug() << "max_user=" << this->maxUsers;
-    QStringList::const_iterator i;
-        for(i=this->userList.constBegin(); i != this->userList.constEnd(); ++i){
-            qDebug() << *i;
-        }
-//    Не понимаю как это использовать правильно. Так как сейчас выглядит как полная хуита.
-    QSharedPointer<QTcpServer> test (new QTcpServer(this));
-    server = &test; // почему тут не надо использовать this?
+    Server::ini_parse("init.ini");
+    qDebug() << "port=" << port;
+    qDebug() << "max_user=" << maxUsers;
 
-    if(!server->data()->listen(QHostAddress::Any, port)){
+    m_server = QSharedPointer<QTcpServer>(new QTcpServer(this));
+
+    if(!m_server->listen(QHostAddress::Any, port)){
         qDebug() << "Error";
-        server->data()->close();
+        m_server->close();
         return;
     }else{
         qDebug() << "Server listening port " << port;
     }
-    connect(server->data(), &QTcpServer::newConnection,
+    connect(m_server.data(), &QTcpServer::newConnection,
             this, &Server::slotNewConnection);
 }
 
@@ -31,42 +26,58 @@ Server::~Server(){
     // надо закрыть сервер?
 }
 
-void Server::iniParse(QString fname){
+void Server::ini_parse(QString fname){
     QSettings sett(QDir::currentPath() + "/" + fname, QSettings::IniFormat);
     sett.setIniCodec("UTF-8");
-    this->port = sett.value("SERVER_SETTINGS/port", 9999).toInt();
-    this->maxUsers = sett.value("SERVER_SETTINGS/max_user", 5).toInt();
+    port = static_cast<quint16>(sett.value("SERVER_SETTINGS/port", 9999).toUInt());
+    maxUsers = static_cast<quint8>(sett.value("SERVER_SETTINGS/max_user", 5).toUInt());
+    m_userList = QSharedPointer< QMap<QString, UserInf> >(new QMap<QString, UserInf>);
     sett.beginGroup("USER_LIST");
-    this->userList = sett.childKeys();
+    QStringList users = sett.childKeys();
+    QStringList::const_iterator i;
+    for (i = users.begin();i != users.end(); i++){
+        m_userList->insert(*i, QSharedPointer<UserInf>(new UserInf));
+    }
 }
 
 void Server::slotNewConnection(){
-    QTcpSocket* clientSocket = this->server->data()->nextPendingConnection(); // ?????
+    QTcpSocket* clientSocket = m_server->nextPendingConnection(); // ?????
     qDebug() << "New connection";
     connect(clientSocket, &QTcpSocket::disconnected,
             clientSocket, &QTcpSocket::deleteLater);
     connect(clientSocket, &QTcpSocket::readyRead,  // Прием данных от клиента
             this, &Server::slotReadClient);
-    sendToClient(clientSocket);
+    send_to_client(clientSocket);
 }
 
 void Server:: slotReadClient(){
-    QTcpSocket *clientSocket = static_cast<QTcpSocket*>(sender());
-//    auto data = QString::fromUtf8(clientSocket->readAll()).trimmed();
-    auto jdata = QJsonDocument::fromJson(clientSocket->readAll(), &jsonErr);
-    if(jsonErr.errorString() == "no error occured"){
-        this->jsonParse(&jdata);
+    QSharedPointer<QTcpSocket> clientSocket = static_cast< QSharedPointer<QTcpSocket> >(sender());
+    auto jDoc = QJsonDocument::fromJson(clientSocket->readAll(), &jsonErr);
+    QJsonObject json = jDoc.object();
+    // Получение адреса клиентского сокета
+    auto address = clientSocket->peerAddress();
+    if(!m_blockIp->contains(address)){
+        if(jsonErr.errorString() == "no error occured"){
+            if( m_userList->contains(json["username"].toString()) ){ // Если имя клиента есть в списке
+                json_parse(json);
+            }else{
+                // Отправка qmessagebox о том что сосать, а не подключение
+                qDebug() << "User is not contained in list";
+            }
+        }else{
+            qDebug() << "Json format error " << jsonErr.errorString();
+        }
     }else{
-        qDebug() << "Json format error " << jsonErr.errorString();
+        // Отправка qmessagebox о том что сосать, а не подключение.
+        qDebug() << "User is not contained in list";
     }
-
 }
 
-void Server::jsonParse(QJsonDocument *doc){
+void Server::json_parse(const QJsonObject &doc){
     qDebug() << "Receive message is " << doc;
 }
 
-void Server::sendToClient(QTcpSocket *sock){
+void Server::send_to_client(QTcpSocket *sock){
     sock -> write("Connected");
 }
 

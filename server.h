@@ -11,26 +11,25 @@
 #include <QJsonParseError>
 #include <QSettings>
 #include <QDir>
+#include <QTime>
 #include <QSharedPointer>
 
+// Сначала public секции затем private
+// сначала конструктор/деструктор. После этого сначала методы, потом переменные
+
+// приватные методы и переменные в стиле с нижним подчеркиванием
+// публичные методы и переменные в стиле кэмэл
+// если создается указатель на что-то в приватном поле то в начало добавляют m_
 
 class Server: public QObject
 {
     Q_OBJECT
-private:
-    QStringList userList;
-    quint16 port;
-    quint8 maxUsers;
-    QSharedPointer< QTcpServer > *server;
-    QByteArray data;
-    QJsonDocument jsonDoc;
-    QJsonParseError jsonErr;
 
-
-private:
-    void iniParse(QString fname);
-    void sendToClient(QTcpSocket *sock);
-    void jsonParse(QJsonDocument *doc);
+    struct UserInf{
+        QSharedPointer<QTcpSocket> socket = nullptr;
+        QSharedPointer<QTime> time = nullptr;
+        quint8 request = 0;
+    };
 
 public:
     Server();
@@ -39,9 +38,22 @@ public:
 public slots:
     void slotNewConnection();
     void slotReadClient();
+
+private:
+    void ini_parse(QString fname);
+    void send_to_client(QTcpSocket *sock);
+    void json_parse(const QJsonObject &doc);
+
+private:
+    quint16 port;
+    quint8 maxUsers;
+    QSharedPointer< QTcpServer > m_server;
+    QByteArray data;
+    QJsonDocument jsonDoc;
+    QJsonParseError jsonErr;
+    QSharedPointer< QMap<QString, QSharedPointer<UserInf>> > m_userList;
+    QSharedPointer< QSet<QHostAddress> > m_blockIp;
+
 };
-
-
-
 
 #endif // SERVER_H
