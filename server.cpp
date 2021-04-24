@@ -32,14 +32,14 @@ void Server::ini_parse(QString fname){
     port = static_cast<quint16>(sett.value("SERVER_SETTINGS/port", 9999).toUInt());
     maxUsers = static_cast<quint8>(sett.value("SERVER_SETTINGS/max_user", 5).toUInt());
     m_userList = QSharedPointer< QMap<QString, UserInf> >(new QMap<QString, UserInf>);
-    // Обработка списка разрешенных пользователей
+    // Инициализация списка разрешенных пользователей
     sett.beginGroup("USER_LIST");
     QStringList iniList = sett.childKeys();
     QStringList::const_iterator i;
     for (i = iniList.begin();i != iniList.end(); ++i){ // FIXME проверить посткремен или декремент
         m_userList->insert(*i, QSharedPointer<UserInf>(new UserInf));
     }
-    // Обработка списка ресурсов. FIXME: Мб стоит использовать имена ресурсов тоже, но пока без этого.
+    // Инициализация списка ресурсов. FIXME: Мб стоит использовать имена ресурсов тоже, но пока без этого.
     sett.beginGroup("RESOURCE_LIST");
     iniList = sett.childKeys();
     m_resList = QSharedPointer< QMap<quint8, QSharedPointer<ResInf>> >(new QMap<quint8, QSharedPointer<ResInf>>);
@@ -62,7 +62,7 @@ void Server::slotNewConnection(){
 
 
 void Server:: slotReadClient(){
-    QSharedPointer<QTcpSocket> clientSocket = static_cast< QSharedPointer<QTcpSocket> >(sender());
+    QSharedPointer<QTcpSocket> clientSocket = static_cast< QSharedPointer<QTcpSocket> >(sender()); // fixme здесь тоже наверное не нужен указатель
     auto jDoc = QJsonDocument::fromJson(clientSocket->readAll(), &jsonErr);
     QJsonObject json = jDoc.object();
     // Получение адреса клиентского сокета
@@ -70,7 +70,8 @@ void Server:: slotReadClient(){
     if(!m_blockIp->contains(address)){
         if(jsonErr.errorString() == "no error occured"){
             if( m_userList->contains(json["username"].toString()) ){ // Если имя клиента есть в списке
-                json_handler(json);
+                if(json.size() > 1) // если это не первичная авторизация, а запрос ресурсов
+                    json_handler(json);
             }else{ // Если нет, то штраф сердечко
                 m_blockIp->insert(address);
                 // Отправка qmessagebox о том что сосать, а не подключение
@@ -87,11 +88,13 @@ void Server:: slotReadClient(){
 
 
 void Server::json_handler(const QJsonObject &jobj){
-    if(jobj.size() > 1){ // Если это запрос ресурсов, а не первичная авторизация.
-        quint32 usrTime = static_cast<quint32>(jobj["time"].toInt());
-        quint32 reqRes = static_cast<quint32>(jobj["request"].toInt());
-        quint32 curRes;
-        // Проверка какие ресурсы хочет пользователь
+    QJsonObject servNotice; // Ответ сервера обратившемуся клиенту
+    QJsonArray resNum, resStatus;
+    quint32 usrTime = static_cast<quint32>(jobj["time"].toInt());
+    quint32 reqRes = static_cast<quint32>(jobj["request"].toInt());
+    quint32 curRes;
+    if(jobj["action"].toString() == "take"){
+    // Проверка какие ресурсы хочет пользователь
         for(int i=0; i<m_resList->size(); i++){
             curRes = (reqRes >> (i*8)) & 0xFF;
             if(curRes > 0){
@@ -100,21 +103,39 @@ void Server::json_handler(const QJsonObject &jobj){
                 if(m_resList->value(i)->currenUser == "Free"){
                     auto usrName = static_cast<QString>(jobj["username"].toString()); // FIXME мб можно без пересоздания объекта?
                     m_resList->insert( i, QSharedPointer<ResInf>(new ResInf(usrTime, usrName)) );
-                    // FIXME надо добавить отправку уведомления об успехе и еще тему  с тем что какие-то ресурсы были заняты а какие-то нет
+                    resNum.push_back(QJsonValue(i));
+                    resStatus.push_back(1);
+
                 // Если занят, но таймер показывает, что пора делиться добром;
                 }else if(diffTime > 7200){ // 7200сек=2ч
                     auto usrName = static_cast<QString>(jobj["username"].toString()); // FIXME мб можно без пересоздания объекта?
                     m_resList->insert( i, QSharedPointer<ResInf>(new ResInf(usrTime, usrName)) );
-                    // FIXME надо добавить отправку уведомления об успехе и еще тему  с тем что какие-то ресурсы были заняты а какие-то нет
-                    // и еще что у пользователя забрали ресурс
+                    resNum.push_back(QJsonValue(i));
+                    resStatus.push_back(1);
+                    // уведомление у пользователя забрали ресурс
                 }else{
-                     // Ответить, что ресурс занят.
+                    resNum.push_back(QJsonValue(i));
+                    resStatus.push_back(0);
                 }
             }
         }
+        // FIXME Надо отправить уведомление о том какие ресурсы заняты, а какие не получилось занять.
+    }else if(jobj["action"].toString() == "free"){
+        for(int i=0; i<m_resList->size(); i++){
+            curRes = (reqRes >> (i*8)) & 0xFF;
+            if(curRes > 0){
+                m_resList->insert( i, QSharedPointer<ResInf>(new ResInf()) );
+            }
+        }
     }else{
-
+        qDebug() << "Error. Not take or free res";
     }
+    // Уведомление конкретного пользователя об успехе/отказе ресурсов
+    /*
+        отправка servNotice
+    */
+    // fixme отправка все пользователем нового списка ресурсов-владельцев
+
 }
 
 

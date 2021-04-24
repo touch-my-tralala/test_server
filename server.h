@@ -6,8 +6,11 @@
 #include <iostream>
 #include <QDebug>
 #include <QString>
+#include <QList>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonValue>
 #include <QJsonParseError>
 #include <QSettings>
 #include <QDir>
@@ -53,7 +56,8 @@ public slots:
 
 private:
     void ini_parse(QString fname);
-    void send_to_client(QTcpSocket *sock); // переделать на const &
+    void send_to_client(QTcpSocket *sock); // FIXME переделать на const &
+    void send_to_all_clients(); // FIXME переделать на const &
     void json_handler(const QJsonObject &jobj);
     void res_request(quint8 resNum, const QString &username);
 
