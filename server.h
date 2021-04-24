@@ -28,7 +28,19 @@ class Server: public QObject
     struct UserInf{
         QSharedPointer<QTcpSocket> socket = nullptr;
         QSharedPointer<QTime> time = nullptr;
-        quint8 request = 0;
+        quint64 request = 0;
+    };
+
+    struct ResInf{
+        ResInf();
+        ResInf(int usrTime, QString username){
+            this->time = QSharedPointer<QTime>(new QTime(usrTime/3600, usrTime&3600, usrTime%60));
+            this->currenUser = username;
+        }
+        ~ResInf();
+
+        QSharedPointer<QTime> time = nullptr;
+        QString currenUser = "Free";
     };
 
 public:
@@ -41,8 +53,9 @@ public slots:
 
 private:
     void ini_parse(QString fname);
-    void send_to_client(QTcpSocket *sock);
-    void json_parse(const QJsonObject &doc);
+    void send_to_client(QTcpSocket *sock); // переделать на const &
+    void json_handler(const QJsonObject &jobj);
+    void res_request(quint8 resNum, const QString &username);
 
 private:
     quint16 port;
@@ -52,6 +65,7 @@ private:
     QJsonDocument jsonDoc;
     QJsonParseError jsonErr;
     QSharedPointer< QMap<QString, QSharedPointer<UserInf>> > m_userList;
+    QSharedPointer< QMap<quint8, QSharedPointer<ResInf>> > m_resList; // имя ресурса - текущий пользователь
     QSharedPointer< QSet<QHostAddress> > m_blockIp;
 
 };
