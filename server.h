@@ -7,6 +7,7 @@
 #include <QDebug>
 #include <QString>
 #include <QList>
+#include <QMap>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -56,7 +57,7 @@ public slots:
 
 private:
     void ini_parse(QString fname);
-    void send_to_client(QTcpSocket *sock); // FIXME переделать на const &
+    void send_to_client(QTcpSocket &sock, const QJsonObject &jObj); // FIXME переделать на const &
     void send_to_all_clients(); // FIXME переделать на const &
     void json_handler(const QJsonObject &jobj);
     void res_request(quint8 resNum, const QString &username);
@@ -68,9 +69,9 @@ private:
     QByteArray data;
     QJsonDocument jsonDoc;
     QJsonParseError jsonErr;
-    QSharedPointer< QMap<QString, QSharedPointer<UserInf>> > m_userList;
-    QSharedPointer< QMap<quint8, QSharedPointer<ResInf>> > m_resList; // имя ресурса - текущий пользователь
-    QSharedPointer< QSet<QHostAddress> > m_blockIp;
+    QMap<QString, QSharedPointer<UserInf>>  m_userList;
+    QMap<quint8, QSharedPointer<ResInf>>  m_resList; // имя ресурса - текущий пользователь
+    QSet<QHostAddress>  m_blockIp;
 
 };
 
