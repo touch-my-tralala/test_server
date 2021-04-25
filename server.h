@@ -61,12 +61,15 @@ private:
     void ini_parse(QString fname);
     void send_to_client(QTcpSocket &sock, const QJsonObject &jObj); // FIXME переделать на const &
     void send_to_all_clients(); // FIXME переделать на const &
-    void json_handler(const QJsonObject &jobj);
     bool registr(const std::string &username, uint32_t resource_index);
+    void all_res_clear();
+    void res_req_handler(const QJsonObject &jObj);
+    void service_handler(const QJsonObject &jObj);
 
 private:
     quint16 port;
     quint8 maxUsers;
+    quint16 maxBusyTime;
     QSharedPointer< QTcpServer > m_server;
     QByteArray data;
     QJsonDocument jsonDoc;

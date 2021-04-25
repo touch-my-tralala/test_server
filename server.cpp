@@ -1,6 +1,11 @@
 #include "server.h"
 
-
+/* Что осталось доделать:
+    1) Таймер времени работы сервера
+    2) Функция service (Запрет подключений и установка таймера)
+    3) внутри функции отправки проверять подключен ли пользователь.
+    4)
+*/
 
 Server::Server()
 {
@@ -70,12 +75,21 @@ void Server:: slotReadClient(){
             if( m_userList.contains(json["username"].toString()) ){ // Если имя клиента есть в списке
                 if(json.size() > 1) // если это не первичная авторизация, а запрос ресурсов
                     m_userList.value(json["username"].toString())->socket = clientSocket;
-                    json_handler(json);
-
+                    if(json["type"].toString() == "clear_res"){
+                        all_res_clear();
+                    }
+                    if(json["type"].toString() == "service_info"){
+                        service_handler(json);
+                    }
+                    if(json["type"].toString() == "res_request"){
+                        res_req_handler(json);
+                    }
+                    // отправка всем пользователям актуальной инфы
+                    send_to_all_clients();
             }else{ // Если нет, то штраф сердечко
                 m_blockIp.insert(address);
                 QJsonObject jObj;
-                jObj.insert("Answer", "Access denied");
+                jObj.insert("type", "connect fail");
                 send_to_client(*clientSocket, jObj);
                 clientSocket->disconnectFromHost();
                 // Отправка qmessagebox о том что сосать, а не подключение
@@ -85,9 +99,9 @@ void Server:: slotReadClient(){
             qDebug() << "Json format error " << jsonErr.errorString();
         }
     }else{
-        // Отправка qmessagebox о том что сосать, а не подключение.
+        // Отправка сообщения о том что сосать, а не подключение.
         QJsonObject jObj;
-        jObj.insert("Answer", "Access denied");
+        jObj.insert("type", "connect fail");
         send_to_client(*clientSocket, jObj);
         clientSocket->disconnectFromHost();
         qDebug() << "User ip in banlist";
@@ -98,14 +112,44 @@ void Server::slotDisconnected(){
     QSharedPointer<QTcpSocket> clientSocket = static_cast< QSharedPointer<QTcpSocket> >(sender());
     QMap<QString, QSharedPointer<UserInf>>::const_iterator i;
     for(i = m_userList.constBegin(); i != m_userList.constEnd(); ++i){
-        if(clientSocket == i.value()->socket){
+        if(clientSocket == i.value()->socket)
             i.value()->socket = nullptr;
-        }
     }
     clientSocket.clear();
 }
 
-void Server::json_handler(const QJsonObject &jobj){
+// Очистка всех ресурсов от пользователей и отправка уведомлений о том что ресурс забрали.
+void Server::all_res_clear(){
+    QJsonObject jObj;
+    QString usrName;
+    for(int i = 0; i < m_resList.size(); ++i){
+        if(m_resList.value(i)->currenUser != "Free"){
+            usrName = m_resList.value(i)->currenUser;
+            jObj.insert("type", "grab_res");
+            jObj.insert("resource", i);
+            send_to_client(*(m_userList.value(usrName)->socket), jObj);
+            m_resList.value(i)->currenUser = "Free";
+            m_resList.value(i)->time = nullptr;
+        }
+    }
+}
+
+// Служебные делишкишы. Установка максимального времени удержания ресурса и блокировка новых соединений.
+void Server::service_handler(const QJsonObject &jObj){
+    if(jObj["action"].toString()== "occupancy_time"){
+        maxBusyTime = static_cast<quint16>(jObj["value"].toInt(), 2);
+    }
+    if(jObj["action"].toString()== "banning_connections"){
+        if(jObj["value"].toInt() == 1){
+
+        }else{
+
+        }
+    }
+}
+
+// Запрос/освобождение ресурсов
+void Server::res_req_handler(const QJsonObject &jobj){
     QJsonObject servNotice; // Ответ сервера обратившемуся клиенту
     QJsonArray resNum, resStatus;
     quint32 usrTime = static_cast<quint32>(jobj["time"].toInt());
@@ -119,32 +163,35 @@ void Server::json_handler(const QJsonObject &jobj){
             if(curRes > 0){
                 int diffTime = QTime::currentTime().secsTo(*(m_resList.value(i)->time)); // так можно делать?
                 // Если ресурс свободен
-                if(m_resList.value(i)->currenUser == "Free" || diffTime > 7200){
+                if(m_resList.value(i)->currenUser == "Free"){
                     m_resList.insert( i, QSharedPointer<ResInf>(new ResInf(usrTime, usrName)) );
                     resNum.push_back(QJsonValue(i));
                     resStatus.push_back(1);
                     // вызов потоко-небезопасной функции
-                    mutex.lock();
                     registr(usrName.toUtf8().constData(), i);
-                    mutex.unlock();
-                    if(diffTime > 7200){
-                        // FIXME уведомление у пользователя забрали ресурс
-                    }
+                }else if(diffTime > (maxBusyTime * 3600)){
+                    QString old_user = m_resList.value(i)->currenUser;
+                    m_resList.insert( i, QSharedPointer<ResInf>(new ResInf(usrTime, usrName)) );
+                    resNum.push_back(QJsonValue(i));
+                    resStatus.push_back(1);
+                    registr(usrName.toUtf8().constData(), i);
+                    // FIXME уведомление у пользователя забрали ресурс
+                    QJsonObject oldUserObj;
+                    oldUserObj.insert("type", "grab_res");
+                    oldUserObj.insert("resource", i);
+                    send_to_client(*(m_userList.value(old_user)->socket), oldUserObj); // уведомление, что ресурс был перехвачен.
                 }else{
                     resNum.push_back(QJsonValue(i));
                     resStatus.push_back(0);
                 }
             }
         }
+        servNotice.insert("type", "request_responce");
         servNotice.insert("username", usrName);
         servNotice.insert("resource", resNum);
         servNotice.insert("status", resStatus);
         send_to_client(*(m_userList.value(usrName)->socket),
                        servNotice);
-        // FIXME Надо отправить уведомление о том какие ресурсы заняты, а какие не получилось занять.
-        /*
-            отправка servNotice
-        */
     }else if(jobj["action"].toString() == "free"){
         for(int i=0; i<m_resList.size(); i++){
             curRes = (reqRes >> (i*8)) & 0xFF;
@@ -155,8 +202,6 @@ void Server::json_handler(const QJsonObject &jobj){
     }else{
         qDebug() << "Error. Not take or free res";
     }    
-    // fixme отправка всем пользователям нового списка ресурсов-владельцев
-
 }
 
 void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
@@ -173,6 +218,7 @@ void Server::send_to_all_clients(){
         resNum.push_back(QJsonValue(*i));
         resUser.push_back(QJsonValue(i.value()->currenUser));
     }
+    jObj.insert("type", "broadcast");
     jObj.insert("resnum", resNum);
     jObj.insert("resuser", resUser);
     QJsonDocument jDoc(jObj);
@@ -187,6 +233,9 @@ void Server::send_to_all_clients(){
 
 bool Server::registr(const std::string &username, uint32_t resource_index){
     // потоко-небезопасная функция
+    mutex.lock();
+    // действия
+    mutex.unlock();
     return true;
 }
 
