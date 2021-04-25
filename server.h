@@ -17,6 +17,7 @@
 #include <QDir>
 #include <QTime>
 #include <QSharedPointer>
+#include <QMutex>
 
 // Сначала public секции затем private
 // сначала конструктор/деструктор. После этого сначала методы, потом переменные
@@ -54,13 +55,14 @@ public:
 public slots:
     void slotNewConnection();
     void slotReadClient();
+    void slotDisconnected();
 
 private:
     void ini_parse(QString fname);
     void send_to_client(QTcpSocket &sock, const QJsonObject &jObj); // FIXME переделать на const &
     void send_to_all_clients(); // FIXME переделать на const &
     void json_handler(const QJsonObject &jobj);
-    void res_request(quint8 resNum, const QString &username);
+    bool registr(const std::string &username, uint32_t resource_index);
 
 private:
     quint16 port;
@@ -72,7 +74,7 @@ private:
     QMap<QString, QSharedPointer<UserInf>>  m_userList;
     QMap<quint8, QSharedPointer<ResInf>>  m_resList; // имя ресурса - текущий пользователь
     QSet<QHostAddress>  m_blockIp;
-
+    QMutex mutex;
 };
 
 #endif // SERVER_H

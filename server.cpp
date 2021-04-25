@@ -9,9 +9,10 @@ Server::Server()
     qDebug() << "max_user=" << maxUsers;
 
     m_server = QSharedPointer<QTcpServer>(new QTcpServer(this));
+    m_server->setMaxPendingConnections(maxUsers);
 
     if(!m_server->listen(QHostAddress::Any, port)){
-        qDebug() << "Error";
+        qDebug() << "Error listening";
         m_server->close();
         return;
     }else{
@@ -22,8 +23,7 @@ Server::Server()
 }
 
 Server::~Server(){
-    // надо удалить settings? или затереть через nullptr?
-    // надо закрыть сервер?
+    m_server->close();
 }
 
 void Server::ini_parse(QString fname){
@@ -35,7 +35,7 @@ void Server::ini_parse(QString fname){
     sett.beginGroup("USER_LIST");
     QStringList iniList = sett.childKeys();
     QStringList::const_iterator i;
-    for (i = iniList.begin();i != iniList.end(); ++i){ // FIXME проверить посткремен или декремент
+    for (i = iniList.begin();i != iniList.end(); ++i){ // FIXME разобраться почему преинкремент
         m_userList.insert(*i, QSharedPointer<UserInf>(new UserInf));
     }
     // Инициализация списка ресурсов. FIXME: Мб стоит использовать имена ресурсов тоже, но пока без этого.
@@ -71,17 +71,26 @@ void Server:: slotReadClient(){
                 if(json.size() > 1) // если это не первичная авторизация, а запрос ресурсов
                     m_userList.value(json["username"].toString())->socket = clientSocket;
                     json_handler(json);
+
             }else{ // Если нет, то штраф сердечко
                 m_blockIp.insert(address);
+                QJsonObject jObj;
+                jObj.insert("Answer", "Access denied");
+                send_to_client(*clientSocket, jObj);
+                clientSocket->disconnectFromHost();
                 // Отправка qmessagebox о том что сосать, а не подключение
                 qDebug() << "User is not contained in list";
             }
-        }else{ // Ошибка json формата
+        }else{ // Ошибка json формата            
             qDebug() << "Json format error " << jsonErr.errorString();
         }
     }else{
         // Отправка qmessagebox о том что сосать, а не подключение.
-        qDebug() << "User is not contained in list";
+        QJsonObject jObj;
+        jObj.insert("Answer", "Access denied");
+        send_to_client(*clientSocket, jObj);
+        clientSocket->disconnectFromHost();
+        qDebug() << "User ip in banlist";
     }
 }
 
@@ -91,9 +100,9 @@ void Server::slotDisconnected(){
     for(i = m_userList.constBegin(); i != m_userList.constEnd(); ++i){
         if(clientSocket == i.value()->socket){
             i.value()->socket = nullptr;
-            clientSocket.clear();
         }
     }
+    clientSocket.clear();
 }
 
 void Server::json_handler(const QJsonObject &jobj){
@@ -110,17 +119,17 @@ void Server::json_handler(const QJsonObject &jobj){
             if(curRes > 0){
                 int diffTime = QTime::currentTime().secsTo(*(m_resList.value(i)->time)); // так можно делать?
                 // Если ресурс свободен
-                if(m_resList.value(i)->currenUser == "Free"){
+                if(m_resList.value(i)->currenUser == "Free" || diffTime > 7200){
                     m_resList.insert( i, QSharedPointer<ResInf>(new ResInf(usrTime, usrName)) );
                     resNum.push_back(QJsonValue(i));
                     resStatus.push_back(1);
-
-                // Если занят, но таймер показывает, что пора делиться добром;
-                }else if(diffTime > 7200){ // 7200сек=2ч
-                    m_resList.insert( i, QSharedPointer<ResInf>(new ResInf(usrTime, usrName)) );
-                    resNum.push_back(QJsonValue(i));
-                    resStatus.push_back(1);
-                    // уведомление у пользователя забрали ресурс
+                    // вызов потоко-небезопасной функции
+                    mutex.lock();
+                    registr(usrName.toUtf8().constData(), i);
+                    mutex.unlock();
+                    if(diffTime > 7200){
+                        // FIXME уведомление у пользователя забрали ресурс
+                    }
                 }else{
                     resNum.push_back(QJsonValue(i));
                     resStatus.push_back(0);
@@ -174,6 +183,11 @@ void Server::send_to_all_clients(){
         }
 
     }
+}
+
+bool Server::registr(const std::string &username, uint32_t resource_index){
+    // потоко-небезопасная функция
+    return true;
 }
 
 
