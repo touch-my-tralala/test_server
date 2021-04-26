@@ -2,6 +2,7 @@
 
 /* Что осталось доделать:
     1) кикать полльзователя если он > минуты не присылает свое имя.
+    2) почему сервер закрывается после принятия первого сообщения?
 */
 
 Server::Server()
@@ -27,12 +28,13 @@ Server::Server()
 }
 
 Server::~Server(){
-    m_server->close();
+    if(m_server->isListening()){
+        m_server->close();
+    }
 }
 
 void Server::ini_parse(QString fname){
     QSettings sett(QDir::currentPath() + "/" + fname, QSettings::IniFormat);
-    qDebug() << QDir::currentPath();
     sett.setIniCodec("UTF-8");
     port = static_cast<quint16>(sett.value("SERVER_SETTINGS/port", 9999).toUInt());
     maxUsers = static_cast<quint8>(sett.value("SERVER_SETTINGS/max_user", 5).toUInt());
@@ -41,7 +43,8 @@ void Server::ini_parse(QString fname){
     QStringList iniList = sett.childKeys();
     QStringList::const_iterator i;
     for (i = iniList.begin();i != iniList.end(); ++i){ // FIXME разобраться почему преинкремент
-        m_userList.insert(*i, QSharedPointer<UserInf>(new UserInf()));
+        auto name = sett.value(*i, "no_data").toString().toLower();
+        m_userList.insert(name, QSharedPointer<UserInf>(new UserInf()));
     }
     // Инициализация списка ресурсов. FIXME: Мб стоит использовать имена ресурсов тоже, но пока без этого.
     sett.beginGroup("RESOURCE_LIST");
@@ -72,10 +75,11 @@ void Server:: slotReadClient(){
     // Получение адреса клиентского сокета
     auto address = clientSocket->peerAddress();
     if(!m_blockIp.contains(address)){
-        if(jsonErr.errorString() == "no error occured"){
+        if(jsonErr.errorString() == "no error occurred"){
             if( m_userList.contains(json["username"].toString()) ){ // Если имя клиента есть в списке
+                qDebug() << "Name correct";
                 if(json.size() > 1){ // если это не первичная авторизация, а запрос ресурсов
-                    //m_userList.value(json["username"].toString())->socket = clientSocket; //FIXME раскоментиить!!!
+                    m_userList.value(json["username"].toString())->socket = clientSocket;
                     if(json["type"].toString() == "clear_res"){
                         all_res_clear();
                     }
@@ -123,8 +127,8 @@ void Server::slotDisconnected(){
         if(clientSocket == i.value()->socket)
             i.value()->socket = nullptr;
     }
-    clientSocket->deleteLater();
-    //clientSocket->clear();
+    //clientSocket->deleteLater();
+    clientSocket.clear();
 }
 
 // Очистка всех ресурсов от пользователей и отправка уведомлений о том что ресурс забрали.
@@ -148,12 +152,19 @@ void Server::service_handler(const QJsonObject &jObj){
     if(jObj["action"].toString()== "occupancy_time"){
         maxBusyTime = static_cast<quint16>(jObj["value"].toInt());
     }
+
     if(jObj["action"].toString()== "banning_connections"){
-        if(jObj["value"].toInt() == 1){
+        if(jObj["value"].toInt() == 1)
             m_server->pauseAccepting();
-        }else{
+        else
             m_server->resumeAccepting();
-        }
+    }
+
+    if(jObj["action"].toString()== "reject_res_req"){
+        if(jObj["value"].toInt() == 1)
+            reject_res_req = true;
+        else
+            reject_res_req = false;
     }
 }
 
@@ -165,42 +176,42 @@ void Server::res_req_handler(const QJsonObject &jobj){
     quint32 reqRes = static_cast<quint32>(jobj["request"].toInt());
     quint32 curRes;
     if(jobj["action"].toString() == "take"){
-    // Проверка какие ресурсы хочет пользователь
-        auto usrName = static_cast<QString>(jobj["username"].toString()); // FIXME мб можно без пересоздания объекта?
-        for(quint8 i=0; i<m_resList.size(); i++){
-            curRes = (reqRes >> (i*8)) & 0xFF;
-            if(curRes > 0){
-                int diffTime = QTime::currentTime().secsTo(*(m_resList.value(i)->time)); // так можно делать?
-                // Если ресурс свободен
-                if(m_resList.value(i)->currenUser == "Free"){
-                    m_resList.insert( i, QSharedPointer<ResInf>(new ResInf(usrTime, usrName)) );
-                    resNum.push_back(QJsonValue(i));
-                    resStatus.push_back(1);
-                    // вызов потоко-небезопасной функции
-                    registr(usrName.toUtf8().constData(), i);
-                }else if(diffTime > (maxBusyTime * 3600)){
-                    QString old_user = m_resList.value(i)->currenUser;
-                    m_resList.insert( i, QSharedPointer<ResInf>(new ResInf(usrTime, usrName)) );
-                    resNum.push_back(QJsonValue(i));
-                    resStatus.push_back(1);
-                    registr(usrName.toUtf8().constData(), i);
-                    // FIXME уведомление у пользователя забрали ресурс
-                    QJsonObject oldUserObj;
-                    oldUserObj.insert("type", "grab_res");
-                    oldUserObj.insert("resource", i);
-                    send_to_client(*(m_userList.value(old_user)->socket), oldUserObj); // уведомление, что ресурс был перехвачен.
-                }else{
-                    resNum.push_back(QJsonValue(i));
-                    resStatus.push_back(0);
+            // Проверка какие ресурсы хочет пользователь
+            auto usrName = static_cast<QString>(jobj["username"].toString()); // FIXME мб можно без пересоздания объекта?
+            for(quint8 i=0; i<m_resList.size(); i++){
+                curRes = (reqRes >> (i*8)) & 0xFF;
+                if(curRes > 0){
+                    int diffTime = QTime::currentTime().secsTo(*(m_resList.value(i)->time)); // так можно делать?
+                    // Если ресурс свободен
+                    if(m_resList.value(i)->currenUser == "Free" && !reject_res_req){
+                        m_resList.insert( i, QSharedPointer<ResInf>(new ResInf(usrTime, usrName)) );
+                        resNum.push_back(QJsonValue(i));
+                        resStatus.push_back(1);
+                        // вызов потоко-небезопасной функции
+                        registr(usrName.toUtf8().constData(), i);
+                    }else if(diffTime > (maxBusyTime * 3600) && !reject_res_req){
+                        QString old_user = m_resList.value(i)->currenUser;
+                        m_resList.insert( i, QSharedPointer<ResInf>(new ResInf(usrTime, usrName)) );
+                        resNum.push_back(QJsonValue(i));
+                        resStatus.push_back(1);
+                        registr(usrName.toUtf8().constData(), i);
+                        // FIXME уведомление у пользователя забрали ресурс
+                        QJsonObject oldUserObj;
+                        oldUserObj.insert("type", "grab_res");
+                        oldUserObj.insert("resource", i);
+                        send_to_client(*(m_userList.value(old_user)->socket), oldUserObj); // уведомление, что ресурс был перехвачен.
+                    }else{
+                        resNum.push_back(QJsonValue(i));
+                        resStatus.push_back(0);
+                    }
                 }
             }
-        }
-        servNotice.insert("type", "request_responce");
-        servNotice.insert("username", usrName);
-        servNotice.insert("resource", resNum);
-        servNotice.insert("status", resStatus);
-        send_to_client(*(m_userList.value(usrName)->socket),
-                       servNotice);
+            servNotice.insert("type", "request_responce");
+            servNotice.insert("username", usrName);
+            servNotice.insert("resource", resNum);
+            servNotice.insert("status", resStatus);
+            send_to_client(*(m_userList.value(usrName)->socket),
+                           servNotice);
     }else if(jobj["action"].toString() == "free"){
         for(quint8 i=0; i<m_resList.size(); i++){
             curRes = (reqRes >> (i*8)) & 0xFF;

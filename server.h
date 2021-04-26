@@ -59,6 +59,7 @@ private:
     void service_handler(const QJsonObject &jObj);
 
 private:
+    bool reject_res_req = false;
     quint16 port;
     quint8 maxUsers;
     quint16 maxBusyTime;
