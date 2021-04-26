@@ -4,20 +4,13 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <iostream>
-#include <QDebug>
-#include <QString>
-#include <QList>
-#include <QMap>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonValue>
-#include <QJsonParseError>
-#include <QSettings>
-#include <QDir>
-#include <QTime>
-#include <QSharedPointer>
-#include <QMutex>
+#include <QtCore>
+// #include <QJsonDocument>
+// #include <QJsonValue>  //? in qtcore?
+// #include <QSettings> //? in qtcore?
+// #include <QDir>
+// #include <QSharedPointer> //
+// #include <QMutex> //? in qtcore?
 
 // Сначала public секции затем private
 // сначала конструктор/деструктор. После этого сначала методы, потом переменные
@@ -31,20 +24,19 @@ class Server: public QObject
     Q_OBJECT
 
     struct UserInf{
-        QSharedPointer<QTcpSocket> socket = nullptr;
-        QSharedPointer<QTime> time = nullptr;
+        QSharedPointer<QTcpSocket> socket;
+        QSharedPointer<QTime> time;
         quint64 request = 0;
     };
 
     struct ResInf{
-        ResInf();
-        ResInf(int usrTime, QString username){
-            this->time = QSharedPointer<QTime>(new QTime(usrTime/3600, usrTime&3600, usrTime%60));
-            this->currenUser = username;
+        ResInf(){}
+        ResInf(quint32 usrTime, QString username){
+            time = QSharedPointer<QTime>(new QTime(usrTime/3600, usrTime&3600, usrTime%60));
+            currenUser = username;
         }
-        ~ResInf();
 
-        QSharedPointer<QTime> time = nullptr;
+        QSharedPointer<QTime> time;
         QString currenUser = "Free";
     };
 
@@ -59,8 +51,8 @@ public slots:
 
 private:
     void ini_parse(QString fname);
-    void send_to_client(QTcpSocket &sock, const QJsonObject &jObj); // FIXME переделать на const &
-    void send_to_all_clients(); // FIXME переделать на const &
+    void send_to_client(QTcpSocket &sock, const QJsonObject &jObj);
+    void send_to_all_clients();
     bool registr(const std::string &username, uint32_t resource_index);
     void all_res_clear();
     void res_req_handler(const QJsonObject &jObj);
@@ -78,6 +70,7 @@ private:
     QMap<quint8, QSharedPointer<ResInf>>  m_resList; // имя ресурса - текущий пользователь
     QSet<QHostAddress>  m_blockIp;
     QMutex mutex;
+    QString startServTime;
 };
 
 #endif // SERVER_H

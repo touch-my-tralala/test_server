@@ -1,10 +1,7 @@
 #include "server.h"
 
 /* Что осталось доделать:
-    1) Таймер времени работы сервера
-    2) Функция service (Запрет подключений и установка таймера)
-    3) внутри функции отправки проверять подключен ли пользователь.
-    4)
+    1) кикать полльзователя если он > минуты не присылает свое имя.
 */
 
 Server::Server()
@@ -25,6 +22,8 @@ Server::Server()
     }
     connect(m_server.data(), &QTcpServer::newConnection,
             this, &Server::slotNewConnection);
+
+    startServTime = QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss");
 }
 
 Server::~Server(){
@@ -33,6 +32,7 @@ Server::~Server(){
 
 void Server::ini_parse(QString fname){
     QSettings sett(QDir::currentPath() + "/" + fname, QSettings::IniFormat);
+    qDebug() << QDir::currentPath();
     sett.setIniCodec("UTF-8");
     port = static_cast<quint16>(sett.value("SERVER_SETTINGS/port", 9999).toUInt());
     maxUsers = static_cast<quint8>(sett.value("SERVER_SETTINGS/max_user", 5).toUInt());
@@ -41,13 +41,13 @@ void Server::ini_parse(QString fname){
     QStringList iniList = sett.childKeys();
     QStringList::const_iterator i;
     for (i = iniList.begin();i != iniList.end(); ++i){ // FIXME разобраться почему преинкремент
-        m_userList.insert(*i, QSharedPointer<UserInf>(new UserInf));
+        m_userList.insert(*i, QSharedPointer<UserInf>(new UserInf()));
     }
     // Инициализация списка ресурсов. FIXME: Мб стоит использовать имена ресурсов тоже, но пока без этого.
     sett.beginGroup("RESOURCE_LIST");
     iniList = sett.childKeys();
     for(quint8 i=0; i<iniList.size(); i++){
-        m_resList.insert(i, QSharedPointer<ResInf>(new ResInf));
+        m_resList.insert(i, QSharedPointer<ResInf>(new ResInf()));
     }
 }
 
@@ -65,7 +65,8 @@ void Server::slotNewConnection(){
 
 
 void Server:: slotReadClient(){
-    QSharedPointer<QTcpSocket> clientSocket = static_cast< QSharedPointer<QTcpSocket> >(sender()); // fixme здесь тоже наверное не нужен умный указатель
+    QSharedPointer<QTcpSocket> clientSocket = QSharedPointer<QTcpSocket>(static_cast<QTcpSocket*>(sender()));
+    //QTcpSocket* clientSocket = static_cast<QTcpSocket*>(sender());
     auto jDoc = QJsonDocument::fromJson(clientSocket->readAll(), &jsonErr);
     QJsonObject json = jDoc.object();
     // Получение адреса клиентского сокета
@@ -73,8 +74,8 @@ void Server:: slotReadClient(){
     if(!m_blockIp.contains(address)){
         if(jsonErr.errorString() == "no error occured"){
             if( m_userList.contains(json["username"].toString()) ){ // Если имя клиента есть в списке
-                if(json.size() > 1) // если это не первичная авторизация, а запрос ресурсов
-                    m_userList.value(json["username"].toString())->socket = clientSocket;
+                if(json.size() > 1){ // если это не первичная авторизация, а запрос ресурсов
+                    //m_userList.value(json["username"].toString())->socket = clientSocket; //FIXME раскоментиить!!!
                     if(json["type"].toString() == "clear_res"){
                         all_res_clear();
                     }
@@ -86,6 +87,12 @@ void Server:: slotReadClient(){
                     }
                     // отправка всем пользователям актуальной инфы
                     send_to_all_clients();
+                }else{
+                    // При первичной авторизации отправляется время запуска сервера.
+                    QJsonObject jObj;
+                    jObj.insert("start_time", startServTime);
+                    send_to_client(*clientSocket, jObj);
+                }
             }else{ // Если нет, то штраф сердечко
                 m_blockIp.insert(address);
                 QJsonObject jObj;
@@ -109,20 +116,22 @@ void Server:: slotReadClient(){
 }
 
 void Server::slotDisconnected(){
-    QSharedPointer<QTcpSocket> clientSocket = static_cast< QSharedPointer<QTcpSocket> >(sender());
+    QSharedPointer<QTcpSocket> clientSocket = QSharedPointer<QTcpSocket>(static_cast<QTcpSocket*>(sender()));
+   //QTcpSocket* clientSocket = static_cast<QTcpSocket*>(sender());
     QMap<QString, QSharedPointer<UserInf>>::const_iterator i;
     for(i = m_userList.constBegin(); i != m_userList.constEnd(); ++i){
         if(clientSocket == i.value()->socket)
             i.value()->socket = nullptr;
     }
-    clientSocket.clear();
+    clientSocket->deleteLater();
+    //clientSocket->clear();
 }
 
 // Очистка всех ресурсов от пользователей и отправка уведомлений о том что ресурс забрали.
 void Server::all_res_clear(){
     QJsonObject jObj;
     QString usrName;
-    for(int i = 0; i < m_resList.size(); ++i){
+    for(quint8 i = 0; i < m_resList.size(); ++i){
         if(m_resList.value(i)->currenUser != "Free"){
             usrName = m_resList.value(i)->currenUser;
             jObj.insert("type", "grab_res");
@@ -137,13 +146,13 @@ void Server::all_res_clear(){
 // Служебные делишкишы. Установка максимального времени удержания ресурса и блокировка новых соединений.
 void Server::service_handler(const QJsonObject &jObj){
     if(jObj["action"].toString()== "occupancy_time"){
-        maxBusyTime = static_cast<quint16>(jObj["value"].toInt(), 2);
+        maxBusyTime = static_cast<quint16>(jObj["value"].toInt());
     }
     if(jObj["action"].toString()== "banning_connections"){
         if(jObj["value"].toInt() == 1){
-
+            m_server->pauseAccepting();
         }else{
-
+            m_server->resumeAccepting();
         }
     }
 }
@@ -158,7 +167,7 @@ void Server::res_req_handler(const QJsonObject &jobj){
     if(jobj["action"].toString() == "take"){
     // Проверка какие ресурсы хочет пользователь
         auto usrName = static_cast<QString>(jobj["username"].toString()); // FIXME мб можно без пересоздания объекта?
-        for(int i=0; i<m_resList.size(); i++){
+        for(quint8 i=0; i<m_resList.size(); i++){
             curRes = (reqRes >> (i*8)) & 0xFF;
             if(curRes > 0){
                 int diffTime = QTime::currentTime().secsTo(*(m_resList.value(i)->time)); // так можно делать?
@@ -193,7 +202,7 @@ void Server::res_req_handler(const QJsonObject &jobj){
         send_to_client(*(m_userList.value(usrName)->socket),
                        servNotice);
     }else if(jobj["action"].toString() == "free"){
-        for(int i=0; i<m_resList.size(); i++){
+        for(quint8 i=0; i<m_resList.size(); i++){
             curRes = (reqRes >> (i*8)) & 0xFF;
             if(curRes > 0){
                 m_resList.insert( i, QSharedPointer<ResInf>(new ResInf()) );
@@ -205,8 +214,12 @@ void Server::res_req_handler(const QJsonObject &jobj){
 }
 
 void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
-    QJsonDocument jDoc(jObj);
-    sock.write(jDoc.toJson());
+    if(sock.state() == QTcpSocket::ConnectedState){
+        QJsonDocument jDoc(jObj);
+        sock.write(jDoc.toJson());
+    }else{
+        qDebug() << "Socket not connected";
+    }
 }
 
 // Обновление данных о ресурсах/пользователях у всех клиентов. Наверное так делать не совсем верно.
@@ -224,7 +237,7 @@ void Server::send_to_all_clients(){
     QJsonDocument jDoc(jObj);
     QMap<QString, QSharedPointer<UserInf>>::const_iterator j;
     for(j = m_userList.constBegin(); j != m_userList.constEnd(); ++j){
-        if(j.value()->socket != nullptr){
+        if(j.value()->socket->state() == QTcpSocket::ConnectedState){
             j.value()->socket->write(jDoc.toJson());
         }
 
