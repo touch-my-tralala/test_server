@@ -3,6 +3,7 @@
 /* Что осталось доделать:
     1) кикать полльзователя если он > минуты не присылает свое имя.
     2) почему сервер закрывается после принятия первого сообщения?
+    3) помимо времени старта сервера надо отправлять еще список ресурс-пользователь новому клиенту
 */
 
 Server::Server()
@@ -16,7 +17,6 @@ Server::Server()
 
     if(!m_server->listen(QHostAddress::Any, port)){
         qDebug() << "Error listening";
-        m_server->close();
         return;
     }else{
         qDebug() << "Server listening port " << port;
@@ -58,19 +58,19 @@ void Server::ini_parse(QString fname){
 void Server::slotNewConnection(){
     QTcpSocket* clientSocket = m_server->nextPendingConnection();
     qDebug() << "New connection";
-//    connect(clientSocket, &QTcpSocket::disconnected,
-//            clientSocket, &QTcpSocket::deleteLater);
     connect(clientSocket, &QTcpSocket::disconnected,
-            this, &Server::slotDisconnected);
+            clientSocket, &QTcpSocket::deleteLater);
+//    connect(clientSocket, &QTcpSocket::disconnected,
+//            this, &Server::slotDisconnected);
     connect(clientSocket, &QTcpSocket::readyRead,
             this, &Server::slotReadClient);
 }
 
 
 void Server:: slotReadClient(){
-    QSharedPointer<QTcpSocket> clientSocket = QSharedPointer<QTcpSocket>(static_cast<QTcpSocket*>(sender()));
+    QSharedPointer<QTcpSocket> clientSocket = QSharedPointer<QTcpSocket>(static_cast<QTcpSocket*>(sender())); // FIXME qobject_cast вместо static_cast
     //QTcpSocket* clientSocket = static_cast<QTcpSocket*>(sender());
-    auto jDoc = QJsonDocument::fromJson(clientSocket->readAll(), &jsonErr);
+    auto jDoc = QJsonDocument::fromJson(clientSocket->readAll(), &jsonErr); // FIXME чтение фиксированными блоками по 4/8/16/32 кб
     QJsonObject json = jDoc.object();
     // Получение адреса клиентского сокета
     auto address = clientSocket->peerAddress();
@@ -78,15 +78,16 @@ void Server:: slotReadClient(){
         if(jsonErr.errorString() == "no error occurred"){
             if( m_userList.contains(json["username"].toString()) ){ // Если имя клиента есть в списке
                 qDebug() << "Name correct";
+                m_userList.value(json["username"].toString())->socket = clientSocket;
                 if(json.size() > 1){ // если это не первичная авторизация, а запрос ресурсов
-                    m_userList.value(json["username"].toString())->socket = clientSocket;
-                    if(json["type"].toString() == "clear_res"){
+                    auto jType = json["type"].toString();
+                    if(jType == "clear_res"){   // FIXME можно сделать enum по индексам и через switch  либо через мапу
                         all_res_clear();
                     }
-                    if(json["type"].toString() == "service_info"){
+                    if(jType == "service_info"){
                         service_handler(json);
                     }
-                    if(json["type"].toString() == "res_request"){
+                    if(jType == "res_request"){
                         res_req_handler(json);
                     }
                     // отправка всем пользователям актуальной инфы
@@ -95,14 +96,14 @@ void Server:: slotReadClient(){
                     // При первичной авторизации отправляется время запуска сервера.
                     QJsonObject jObj;
                     jObj.insert("start_time", startServTime);
-                    send_to_client(*clientSocket, jObj);
+                    send_to_client(*clientSocket.data(), jObj);
                 }
             }else{ // Если нет, то штраф сердечко
                 m_blockIp.insert(address);
                 QJsonObject jObj;
                 jObj.insert("type", "connect fail");
                 send_to_client(*clientSocket, jObj);
-                clientSocket->disconnectFromHost();
+                clientSocket->abort();
                 // Отправка qmessagebox о том что сосать, а не подключение
                 qDebug() << "User is not contained in list";
             }
@@ -122,13 +123,17 @@ void Server:: slotReadClient(){
 void Server::slotDisconnected(){
     QSharedPointer<QTcpSocket> clientSocket = QSharedPointer<QTcpSocket>(static_cast<QTcpSocket*>(sender()));
    //QTcpSocket* clientSocket = static_cast<QTcpSocket*>(sender());
+    for(auto i : m_userList){
+
+    }
+    // FIXME сначала  удалить указатель из контейнера, потом закрыть сокет правильно, потом удалить сокет.
     QMap<QString, QSharedPointer<UserInf>>::const_iterator i;
     for(i = m_userList.constBegin(); i != m_userList.constEnd(); ++i){
         if(clientSocket == i.value()->socket)
             i.value()->socket = nullptr;
     }
     //clientSocket->deleteLater();
-    clientSocket.clear();
+    //clientSocket.clear();
 }
 
 // Очистка всех ресурсов от пользователей и отправка уведомлений о том что ресурс забрали.
@@ -177,7 +182,7 @@ void Server::res_req_handler(const QJsonObject &jobj){
     quint32 curRes;
     if(jobj["action"].toString() == "take"){
             // Проверка какие ресурсы хочет пользователь
-            auto usrName = static_cast<QString>(jobj["username"].toString()); // FIXME мб можно без пересоздания объекта?
+            auto usrName = jobj["username"].toString();
             for(quint8 i=0; i<m_resList.size(); i++){
                 curRes = (reqRes >> (i*8)) & 0xFF;
                 if(curRes > 0){

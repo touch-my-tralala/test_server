@@ -32,7 +32,7 @@ class Server: public QObject
     struct ResInf{
         ResInf(){}
         ResInf(quint32 usrTime, QString username){
-            time = QSharedPointer<QTime>(new QTime(usrTime/3600, usrTime&3600, usrTime%60));
+            time = QSharedPointer<QTime>(new QTime(usrTime/3600, usrTime&3600, usrTime%60)); // FIXME можно убрать qsharedpointer
             currenUser = username;
         }
 
@@ -67,7 +67,7 @@ private:
     QByteArray data;
     QJsonDocument jsonDoc;
     QJsonParseError jsonErr;
-    QMap<QString, QSharedPointer<UserInf>>  m_userList;
+    QMap<QString, QSharedPointer<UserInf>>  m_userList; // FIXME можно без qsharedpointer
     QMap<quint8, QSharedPointer<ResInf>>  m_resList; // имя ресурса - текущий пользователь
     QSet<QHostAddress>  m_blockIp;
     QMutex mutex;
