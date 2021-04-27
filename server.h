@@ -5,12 +5,6 @@
 #include <QTcpSocket>
 #include <iostream>
 #include <QtCore>
-// #include <QJsonDocument>
-// #include <QJsonValue>  //? in qtcore?
-// #include <QSettings> //? in qtcore?
-// #include <QDir>
-// #include <QSharedPointer> //
-// #include <QMutex> //? in qtcore?
 
 // Сначала public секции затем private
 // сначала конструктор/деструктор. После этого сначала методы, потом переменные
@@ -24,19 +18,22 @@ class Server: public QObject
     Q_OBJECT
 
     struct UserInf{
-        QSharedPointer<QTcpSocket> socket;
-        QSharedPointer<QTime> time;
+        QTcpSocket* socket;
+        QTime* time;
         quint64 request = 0;
     };
 
     struct ResInf{
         ResInf(){}
         ResInf(quint32 usrTime, QString username){
-            time = QSharedPointer<QTime>(new QTime(usrTime/3600, usrTime&3600, usrTime%60)); // FIXME можно убрать qsharedpointer
+            time = new QTime(usrTime/3600, usrTime&3600, usrTime%60); // FIXME можно убрать qsharedpointer
             currenUser = username;
         }
+        ~ResInf(){
+            delete time;
+        }
 
-        QSharedPointer<QTime> time;
+        QTime* time;
         QString currenUser = "Free";
     };
 
@@ -57,18 +54,20 @@ private:
     void all_res_clear();
     void res_req_handler(const QJsonObject &jObj);
     void service_handler(const QJsonObject &jObj);
+    void new_client_autorization(QTcpSocket &sock);
 
 private:
     bool reject_res_req = false;
     quint16 port;
     quint8 maxUsers;
     quint16 maxBusyTime;
+    quint16 m_nextBlockSize;
     QSharedPointer< QTcpServer > m_server;
     QByteArray data;
     QJsonDocument jsonDoc;
     QJsonParseError jsonErr;
-    QMap<QString, QSharedPointer<UserInf>>  m_userList; // FIXME можно без qsharedpointer
-    QMap<quint8, QSharedPointer<ResInf>>  m_resList; // имя ресурса - текущий пользователь
+    QMap<QString, UserInf*>  m_userList; // FIXME можно без qsharedpointer
+    QMap<quint8, ResInf*>  m_resList; // имя ресурса - текущий пользователь
     QSet<QHostAddress>  m_blockIp;
     QMutex mutex;
     QString startServTime;
