@@ -12,6 +12,7 @@
 // приватные методы и переменные в стиле с нижним подчеркиванием
 // публичные методы и переменные в стиле кэмэл
 // если создается указатель на что-то в приватном поле то в начало добавляют m_
+#define READ_BLOCK_SIZE 32768 // 32 кб
 
 class Server: public QObject
 {
@@ -51,6 +52,7 @@ private:
     void send_to_client(QTcpSocket &sock, const QJsonObject &jObj);
     void send_to_all_clients();
     bool registr(const std::string &username, uint32_t resource_index);
+    void json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket);
     void all_res_clear();
     void res_req_handler(const QJsonObject &jObj);
     void service_handler(const QJsonObject &jObj);
@@ -59,7 +61,7 @@ private:
 private:
     const qint64 numReadByte = 32;
     quint32 m_nextBlock = 0;
-    QByteArray data;
+    QByteArray buff;
     bool reject_res_req = false;
     quint16 port;
     quint8 maxUsers;

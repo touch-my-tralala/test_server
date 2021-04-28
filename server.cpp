@@ -3,7 +3,6 @@
 /* Что осталось доделать:
     1) кикать полльзователя если он > минуты не присылает свое имя.
     2) почему сервер закрывается после принятия первого сообщения?
-    3) помимо времени старта сервера надо отправлять еще список ресурс-пользователь новому клиенту
 */
 
 Server::Server()
@@ -69,75 +68,71 @@ void Server::slotNewConnection(){
 
 void Server:: slotReadClient(){
     QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender()); // FIXME тут надо QSharedPointer?
-
-
-    // FIXME узнавать количество байт в буфере и считать количество итераций цикла.
-
-    while(true){
-        if(!m_nextBlock){
-            if(clientSocket->bytesAvailable() < sizeof(quint32)){ // FIXME не 4 байта, а например 32 килобайта
-                data = clientSocket->read(clientSocket->bytesAvailable());
-            }else{
-                data = clientSocket->read(sizeof(quint32));
-            }
-        }
-        auto jDoc = QJsonDocument::fromJson(data, &jsonErr);
-        if(jsonErr.errorString() == QJsonParseError::NoError){
-            break;
-        }
-        if(jsonErr.errorString() == QJsonParseError::UnterminatedObject){ // Объект неправильно заканчивается закрывающей фигурной скобкой
-            // FIXME надо data прибавлять к отдельной переменной и идти на новый круг за еще данными.
+    qint64 curByteNum = clientSocket->bytesAvailable();
+    if(curByteNum <= READ_BLOCK_SIZE){
+        buff.append(clientSocket->read(curByteNum));
+    }else{
+        for(int i=0; i<=curByteNum/READ_BLOCK_SIZE; i=i+READ_BLOCK_SIZE){
+            buff.append( clientSocket->read(READ_BLOCK_SIZE) );
         }
     }
+    auto jDoc = QJsonDocument::fromJson(buff, &jsonErr);
+    if(jsonErr.errorString() == QJsonParseError::UnterminatedObject){
+        return;
+    }
+    if(jsonErr.errorString() == QJsonParseError::NoError){
+        auto address = clientSocket->peerAddress();
+        json_handler(jDoc.object(), address, *clientSocket);
+        buff.clear();
+    }
+}
 
-    auto jDoc = QJsonDocument::fromJson(clientSocket->readAll(), &jsonErr); // FIXME чтение фиксированными блоками по 4/8/16/32 кб
 
-    QJsonObject json = jDoc.object();
-    // Получение адреса клиентского сокета
-    auto address = clientSocket->peerAddress();
-    if(!m_blockIp.contains(address)){
+void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket){
+    if(!m_blockIp.contains(clientIp)){
         if(jsonErr.errorString() == "no error occurred"){
-            if( m_userList.contains(json["username"].toString()) ){ // Если имя клиента есть в списке
+            if( m_userList.contains(jObj["username"].toString()) ){ // Если имя клиента есть в списке
                 qDebug() << "Name correct";
-                m_userList.value(json["username"].toString())->socket = clientSocket;
-                if(json.size() > 1){ // если это не первичная авторизация, а запрос ресурсов
-                    auto jType = json["type"].toString();
+                m_userList.value(jObj["username"].toString())->socket = &clientSocket; // FIXME здесь норм &??
+                if(jObj.size() > 1){ // если это не первичная авторизация, а запрос ресурсов
+                    auto jType = jObj["type"].toString();
                     if(jType == "clear_res"){   // FIXME можно сделать enum по индексам и через switch  либо через мапу
                         all_res_clear();
                     }
                     if(jType == "service_info"){
-                        service_handler(json);
+                        service_handler(jObj);
                     }
                     if(jType == "res_request"){
-                        res_req_handler(json);
+                        res_req_handler(jObj);
                     }
                     // отправка всем пользователям актуальной инфы
                     send_to_all_clients();
                 }else{
                     // При первичной авторизации отправляется время запуска сервера и список всех ресурсов/пользователь.
-                    new_client_autorization(*clientSocket);
+                    new_client_autorization(clientSocket);
                 }
             }else{ // Если нет, то штраф сердечко
-                m_blockIp.insert(address);
+                m_blockIp.insert(clientIp);
                 QJsonObject jObj;
                 jObj.insert("type", "connect fail");
-                send_to_client(*clientSocket, jObj);
-                clientSocket->abort();
+                send_to_client(clientSocket, jObj);
+                clientSocket.abort();
                 // Отправка qmessagebox о том что сосать, а не подключение
                 qDebug() << "User is not contained in list";
             }
-        }else{ // Ошибка json формата            
+        }else{ // Ошибка json формата
             qDebug() << "Json format error " << jsonErr.errorString();
         }
     }else{
         // Отправка сообщения о том что сосать, а не подключение.
         QJsonObject jObj;
         jObj.insert("type", "connect fail");
-        send_to_client(*clientSocket, jObj);
-        clientSocket->disconnectFromHost();
+        send_to_client(clientSocket, jObj);
+        clientSocket.disconnectFromHost();
         qDebug() << "User ip in banlist";
     }
 }
+
 
 void Server::slotDisconnected(){
     QTcpSocket* clientSocket = qobject_cast<QTcpSocket*>(sender());
@@ -149,6 +144,7 @@ void Server::slotDisconnected(){
     clientSocket->abort(); // FIXME возможно здесь надо исользовать close()?
     clientSocket->deleteLater();
 }
+
 
 // Первое подключение пользователя. Ему отправляется время старта сервера и список ресурсов и кто их занимает и время.
 void Server::new_client_autorization(QTcpSocket &sock){
@@ -167,6 +163,7 @@ void Server::new_client_autorization(QTcpSocket &sock){
     send_to_client(sock, jObj);
 }
 
+
 // Очистка всех ресурсов от пользователей и отправка уведомлений о том что ресурс забрали.
 void Server::all_res_clear(){
     QJsonObject jObj;
@@ -182,6 +179,7 @@ void Server::all_res_clear(){
         }
     }
 }
+
 
 // Служебные делишкишы. Установка максимального времени удержания ресурса и блокировка новых соединений.
 void Server::service_handler(const QJsonObject &jObj){
@@ -203,6 +201,7 @@ void Server::service_handler(const QJsonObject &jObj){
             reject_res_req = false;
     }
 }
+
 
 // Запрос/освобождение ресурсов
 void Server::res_req_handler(const QJsonObject &jobj){
@@ -259,6 +258,7 @@ void Server::res_req_handler(const QJsonObject &jobj){
     }    
 }
 
+
 void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
     if(sock.state() == QTcpSocket::ConnectedState){
         QJsonDocument jDoc(jObj);
@@ -267,6 +267,7 @@ void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
         qDebug() << "Socket not connected";
     }
 }
+
 
 // Обновление данных о ресурсах/пользователях у всех клиентов. Наверное так делать не совсем верно.
 void Server::send_to_all_clients(){
@@ -289,6 +290,7 @@ void Server::send_to_all_clients(){
 
     }
 }
+
 
 bool Server::registr(const std::string &username, uint32_t resource_index){
     // потоко-небезопасная функция
