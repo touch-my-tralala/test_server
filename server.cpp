@@ -69,20 +69,26 @@ void Server::slotNewConnection(){
 
 void Server:: slotReadClient(){
     QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender()); // FIXME тут надо QSharedPointer?
-    QDataStream in(clientSocket);
-    // in.setVersion(QDataStream::Qt_5_0); //FIXME: разобраться с документацией https://doc.qt.io/qt-5/qdatastream.html#versioning
-//    while(true){
-//        if(!m_nextBlockSize){
-//            if(clientSocket->bytesAvailable() < sizeof (quint16)){
-//                break;
-//            }
-//            in >> m_nextBlockSize;
-//        }
-//        if(clientSocket->bytesAvailable() < m_nextBlockSize){
-//            break;
-//        }
 
-//    }
+
+    // FIXME узнавать количество байт в буфере и считать количество итераций цикла.
+
+    while(true){
+        if(!m_nextBlock){
+            if(clientSocket->bytesAvailable() < sizeof(quint32)){ // FIXME не 4 байта, а например 32 килобайта
+                data = clientSocket->read(clientSocket->bytesAvailable());
+            }else{
+                data = clientSocket->read(sizeof(quint32));
+            }
+        }
+        auto jDoc = QJsonDocument::fromJson(data, &jsonErr);
+        if(jsonErr.errorString() == QJsonParseError::NoError){
+            break;
+        }
+        if(jsonErr.errorString() == QJsonParseError::UnterminatedObject){ // Объект неправильно заканчивается закрывающей фигурной скобкой
+            // FIXME надо data прибавлять к отдельной переменной и идти на новый круг за еще данными.
+        }
+    }
 
     auto jDoc = QJsonDocument::fromJson(clientSocket->readAll(), &jsonErr); // FIXME чтение фиксированными блоками по 4/8/16/32 кб
 

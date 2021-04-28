@@ -57,13 +57,14 @@ private:
     void new_client_autorization(QTcpSocket &sock);
 
 private:
+    const qint64 numReadByte = 32;
+    quint32 m_nextBlock = 0;
+    QByteArray data;
     bool reject_res_req = false;
     quint16 port;
     quint8 maxUsers;
-    quint16 maxBusyTime;
-    quint16 m_nextBlockSize;
-    QSharedPointer< QTcpServer > m_server;
-    QByteArray data;
+    quint16 maxBusyTime;    
+    QSharedPointer< QTcpServer > m_server;    
     QJsonDocument jsonDoc;
     QJsonParseError jsonErr;
     QMap<QString, UserInf*>  m_userList; // FIXME можно без qsharedpointer
