@@ -66,7 +66,7 @@ void Server::slotNewConnection(){
 }
 
 
-void Server:: slotReadClient(){
+void Server::slotReadClient(){
     QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender()); // FIXME тут надо QSharedPointer?
     qint64 curByteNum = clientSocket->bytesAvailable();
     if(curByteNum <= READ_BLOCK_SIZE){
@@ -76,6 +76,7 @@ void Server:: slotReadClient(){
             buff.append( clientSocket->read(READ_BLOCK_SIZE) );
         }
     }
+    // FIXME надо добавить то, что если буфер превышает по размеру какое-то значение полностью его очищать
     auto jDoc = QJsonDocument::fromJson(buff, &jsonErr);
     if(jsonErr.errorString() == QJsonParseError::UnterminatedObject){
         return;
@@ -90,38 +91,34 @@ void Server:: slotReadClient(){
 
 void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket){
     if(!m_blockIp.contains(clientIp)){
-        if(jsonErr.errorString() == "no error occurred"){
-            if( m_userList.contains(jObj["username"].toString()) ){ // Если имя клиента есть в списке
-                qDebug() << "Name correct";
-                m_userList.value(jObj["username"].toString())->socket = &clientSocket; // FIXME здесь норм &??
-                if(jObj.size() > 1){ // если это не первичная авторизация, а запрос ресурсов
-                    auto jType = jObj["type"].toString();
-                    if(jType == "clear_res"){   // FIXME можно сделать enum по индексам и через switch  либо через мапу
-                        all_res_clear();
-                    }
-                    if(jType == "service_info"){
-                        service_handler(jObj);
-                    }
-                    if(jType == "res_request"){
-                        res_req_handler(jObj);
-                    }
-                    // отправка всем пользователям актуальной инфы
-                    send_to_all_clients();
-                }else{
-                    // При первичной авторизации отправляется время запуска сервера и список всех ресурсов/пользователь.
-                    new_client_autorization(clientSocket);
+        if( m_userList.contains(jObj["username"].toString()) ){ // Если имя клиента есть в списке
+            qDebug() << "Name correct";
+            m_userList.value(jObj["username"].toString())->socket = &clientSocket; // FIXME здесь норм &??
+            if(jObj.size() > 1){ // если это не первичная авторизация, а запрос ресурсов
+                auto jType = jObj["type"].toString();
+                if(jType == "clear_res"){   // FIXME можно сделать enum по индексам и через switch  либо через мапу
+                    all_res_clear();
                 }
-            }else{ // Если нет, то штраф сердечко
-                m_blockIp.insert(clientIp);
-                QJsonObject jObj;
-                jObj.insert("type", "connect fail");
-                send_to_client(clientSocket, jObj);
-                clientSocket.abort();
-                // Отправка qmessagebox о том что сосать, а не подключение
-                qDebug() << "User is not contained in list";
+                if(jType == "service_info"){
+                    service_handler(jObj);
+                }
+                if(jType == "res_request"){
+                    res_req_handler(jObj);
+                }
+                // отправка всем пользователям актуальной инфы
+                send_to_all_clients();
+            }else{
+                // При первичной авторизации отправляется время запуска сервера и список всех ресурсов/пользователь.
+                new_client_autorization(clientSocket);
             }
-        }else{ // Ошибка json формата
-            qDebug() << "Json format error " << jsonErr.errorString();
+        }else{ // Если нет, то штраф сердечко
+            m_blockIp.insert(clientIp);
+            QJsonObject jObj;
+            jObj.insert("type", "connect fail");
+            send_to_client(clientSocket, jObj);
+            clientSocket.abort();
+            // Отправка qmessagebox о том что сосать, а не подключение
+            qDebug() << "User is not contained in list";
         }
     }else{
         // Отправка сообщения о том что сосать, а не подключение.
