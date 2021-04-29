@@ -20,21 +20,22 @@ class Server: public QObject
 
     struct UserInf{
         QTcpSocket* socket;
-        QTime* time;
+        QTime* time = nullptr;
         quint64 request = 0;
     };
 
     struct ResInf{
         ResInf(){}
         ResInf(quint32 usrTime, QString username){
-            time = new QTime(usrTime/3600, usrTime&3600, usrTime%60); // FIXME можно убрать qsharedpointer
+            time = new QTime(usrTime/3600, usrTime%3600, usrTime%60); // FIXME можно убрать qsharedpointer
             currenUser = username;
         }
         ~ResInf(){
             delete time;
+            time = nullptr;
         }
 
-        QTime* time;
+        QTime* time = nullptr;
         QString currenUser = "Free";
     };
 

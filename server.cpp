@@ -49,7 +49,7 @@ void Server::ini_parse(QString fname){
     sett.beginGroup("RESOURCE_LIST");
     iniList = sett.childKeys();
     for(quint8 i=0; i<iniList.size(); i++){
-        m_resList.insert(i, new ResInf());
+        m_resList.insert(i, new ResInf(0, "Free"));
     }
 }
 
@@ -114,7 +114,7 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
         }else{ // Если нет, то штраф сердечко
             m_blockIp.insert(clientIp);
             QJsonObject jObj;
-            jObj.insert("type", "connect fail");
+            jObj.insert("type", "connect_fail");
             send_to_client(clientSocket, jObj);
             clientSocket.abort();
             // Отправка qmessagebox о том что сосать, а не подключение
@@ -123,7 +123,7 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
     }else{
         // Отправка сообщения о том что сосать, а не подключение.
         QJsonObject jObj;
-        jObj.insert("type", "connect fail");
+        jObj.insert("type", "connect_fail");
         send_to_client(clientSocket, jObj);
         clientSocket.disconnectFromHost();
         qDebug() << "User ip in banlist";
