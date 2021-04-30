@@ -57,7 +57,7 @@ private:
     void all_res_clear();
     void res_req_handler(const QJsonObject &jObj);
     void service_handler(const QJsonObject &jObj);
-    void new_client_autorization(QTcpSocket &sock);
+    void new_client_autorization(QTcpSocket &sock, const QString &newUsrName);
 
 private:
     const qint64 numReadByte = 32;
