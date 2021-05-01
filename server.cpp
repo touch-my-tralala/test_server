@@ -34,27 +34,29 @@ Server::~Server(){
 
 void Server::ini_parse(QString fname){
     QSettings sett(QDir::currentPath() + "/" + fname, QSettings::IniFormat);
-    sett.setIniCodec("UTF-8");
-    port = static_cast<quint16>(sett.value("SERVER_SETTINGS/port", 9999).toUInt());
-    maxUsers = static_cast<quint8>(sett.value("SERVER_SETTINGS/max_user", 5).toUInt());
+    if(sett.isWritable()){
+        sett.setIniCodec("UTF-8");
+        port = static_cast<quint16>(sett.value("SERVER_SETTINGS/port", 9999).toUInt());
+        maxUsers = static_cast<quint8>(sett.value("SERVER_SETTINGS/max_user", 5).toUInt());
 
-    // Инициализация списка разрешенных пользователей
-    sett.beginGroup("USER_LIST");
-    QStringList iniList = sett.childKeys();
-    qDebug() << iniList;
-    for (auto i : iniList){
-        auto name = sett.value(i, "no_data").toString().toLower();
-        m_userList.insert(name, new UserInf()); // FIXME так норм с указателем?
+        // Инициализация списка разрешенных пользователей
+        sett.beginGroup("USER_LIST");
+        QStringList iniList = sett.childKeys();
+        for (auto i : iniList){
+            auto name = sett.value(i, "no_data").toString().toLower();
+            m_userList.insert(name, new UserInf()); // FIXME так норм с указателем?
+        }
+        sett.endGroup();
+        // Инициализация списка ресурсов. FIXME: Мб стоит использовать имена ресурсов тоже, но пока без этого.
+        sett.beginGroup("RESOURCE_LIST");
+        iniList = sett.childKeys();
+        for(quint8 i=0; i<iniList.size(); i++){
+            m_resList.insert(i, new ResInf(0, "Free"));
+        }
+        sett.endGroup();
+   }else{
+        qDebug() << "ini file cant oppen";
     }
-    sett.endGroup();
-    // Инициализация списка ресурсов. FIXME: Мб стоит использовать имена ресурсов тоже, но пока без этого.
-    sett.beginGroup("RESOURCE_LIST");
-    QStringList testList = sett.childKeys();
-    qDebug() << testList;
-    for(quint8 i=0; i<iniList.size(); i++){
-        m_resList.insert(i, new ResInf(0, "Free"));
-    }
-    sett.endGroup();
 }
 
 
@@ -139,6 +141,7 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
 
 void Server::slotDisconnected(){
     QTcpSocket* clientSocket = qobject_cast<QTcpSocket*>(sender());
+    qDebug() << clientSocket << " disconnected";
     // FIXME сначала  удалить указатель из контейнера, потом закрыть сокет правильно, потом удалить сокет.
     for(auto i : m_userList){
         if(clientSocket == i->socket) // FIXME это сравнение будет нормально работать или сравняться указатели?
