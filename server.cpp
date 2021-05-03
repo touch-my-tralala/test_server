@@ -2,7 +2,6 @@
 #include<QSettings>
 /* Что осталось доделать:
     1) кикать полльзователя если он > минуты не присылает свое имя.
-    2) почему сервер закрывается после принятия первого сообщения?
 */
 
 Server::Server()
@@ -202,18 +201,18 @@ void Server::all_res_clear(){
 // Служебные делишкишы. Установка максимального времени удержания ресурса и блокировка новых соединений.
 void Server::service_handler(const QJsonObject &jObj){
     if(jObj["action"].toString()== "occupancy_time"){
-        maxBusyTime = static_cast<quint16>(jObj["value"].toInt());
+        maxBusyTime = static_cast<quint64>(jObj["value"].toInt());
     }
 
-    if(jObj["action"].toString()== "banning_connections"){
-        if(jObj["value"].toInt() == 1)
+    if(jObj["action"].toString()== "reject_connections"){
+        if(jObj["value"].toInt())
             m_server->pauseAccepting();
         else
             m_server->resumeAccepting();
     }
 
     if(jObj["action"].toString()== "reject_res_req"){
-        if(jObj["value"].toInt() == 1)
+        if(jObj["value"].toInt())
             reject_res_req = true;
         else
             reject_res_req = false;
@@ -234,7 +233,8 @@ void Server::res_req_handler(const QJsonObject &jobj){
             for(quint8 i=0; i<m_resList.size(); i++){
                 curRes = (reqRes >> (i*8)) & 0xFF;
                 if(curRes > 0){
-                    int diffTime = QTime::currentTime().secsTo(*(m_resList.value(i)->time)); // так можно делать?
+                    //int diffTime = QTime::currentTime().secsTo(*(m_resList[i]->time)); // так можно делать?
+                    qint64 diffTime = m_resList[i]->time->secsTo(QTime::currentTime());
                     // Если ресурс свободен
                     if(m_resList.value(i)->currenUser == "Free" && !reject_res_req){
                         m_resList.insert( i, new ResInf(usrTime, usrName));
@@ -242,7 +242,7 @@ void Server::res_req_handler(const QJsonObject &jobj){
                         resStatus.push_back(1);
                         // вызов потоко-небезопасной функции
                         registr(usrName.toUtf8().constData(), i);
-                    }else if(diffTime > (maxBusyTime * 3600) && !reject_res_req){
+                    }else if(diffTime > maxBusyTime && !reject_res_req){
                         QString old_user = m_resList.value(i)->currenUser;
                         m_resList.insert( i, new ResInf(usrTime, usrName));
                         resNum.push_back(QJsonValue(i));

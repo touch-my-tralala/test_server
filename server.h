@@ -27,7 +27,7 @@ class Server: public QObject
     struct ResInf{
         ResInf(){}
         ResInf(quint32 usrTime, QString username){
-            time = new QTime(usrTime/3600, usrTime%3600, usrTime%60); // FIXME можно убрать qsharedpointer
+            time = new QTime(usrTime/3600, (usrTime%3600)/60, usrTime%60); // FIXME можно убрать qsharedpointer
             currenUser = username;
         }
         ~ResInf(){
@@ -66,7 +66,7 @@ private:
     bool reject_res_req = false;
     quint16 port;
     quint8 maxUsers;
-    quint16 maxBusyTime;    
+    qint64 maxBusyTime = 7200; // 2 часа
     QSharedPointer< QTcpServer > m_server;    
     QJsonDocument jsonDoc;
     QJsonParseError jsonErr;
