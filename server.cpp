@@ -178,13 +178,24 @@ void Server::all_res_clear(){
     for(quint8 i = 0; i < m_resList.size(); ++i){
         if(m_resList.value(i)->currenUser != "Free"){
             usrName = m_resList.value(i)->currenUser;
-            jObj.insert("type", "grab_res");
-            jObj.insert("resource", i);
-            send_to_client(*m_userList.value(usrName)->socket, jObj);
+            if(m_grabRes.contains(usrName)){
+                m_grabRes[usrName]->push_back(i);
+            }else{
+                m_grabRes.insert(usrName, new QJsonArray);
+                m_grabRes[usrName]->push_back(i);
             m_resList.value(i)->currenUser = "Free";
             m_resList.value(i)->time = nullptr;
+            }
         }
     }
+    QMap<QString, QJsonArray*>::const_iterator i;
+    QJsonObject oldUserObj;
+    for(i = m_grabRes.begin(); i != m_grabRes.end(); ++i){
+        oldUserObj.insert("type", "grab_res");
+        oldUserObj.insert("resource", *i.value());
+        send_to_client(*m_userList[i.key()]->socket, oldUserObj);
+    }
+    m_grabRes.clear();
 }
 
 
@@ -236,20 +247,34 @@ void Server::res_req_handler(const QJsonObject &jobj){
                         m_resList.insert( i, new ResInf(usrTime, usrName));
                         resNum.push_back(QJsonValue(i));
                         resStatus.push_back(1);
+                        // вызов потоко-небезопасной функции
                         registr(usrName.toUtf8().constData(), i);
-                        // FIXME уведомление у пользователя забрали ресурс
-                        QJsonObject oldUserObj;
-                        oldUserObj.insert("type", "grab_res");
-                        oldUserObj.insert("resource", i);
-                        send_to_client(*m_userList.value(old_user)->socket, oldUserObj); // уведомление, что ресурс был перехвачен.
+                        // Составление списка пользователей у которых забрали ресурсы.
+                        if(m_grabRes.contains(old_user)){
+                            m_grabRes[old_user]->push_back(i);
+                        }else{
+                            m_grabRes.insert(old_user, new QJsonArray);
+                            m_grabRes[old_user]->push_back(i);
+                        }
                     }else{
                         resNum.push_back(QJsonValue(i));
                         resStatus.push_back(0);
                     }
                 }
             }
+
+            // Отправка всем пользователям у которых забрали ресурс список какие ресурсы у них забрали.
+            QMap<QString, QJsonArray*>::const_iterator i;
+            QJsonObject oldUserObj;
+            for(i = m_grabRes.begin(); i != m_grabRes.end(); ++i){
+                oldUserObj.insert("type", "grab_res");
+                oldUserObj.insert("resource", *i.value());
+                send_to_client(*m_userList[i.key()]->socket, oldUserObj);
+            }
+            m_grabRes.clear();
+
             servNotice.insert("type", "request_responce");
-            servNotice.insert("username", usrName);
+//            servNotice.insert("username", usrName); // FIXME это надо?
             servNotice.insert("resource", resNum);
             servNotice.insert("status", resStatus);
             send_to_client(*m_userList.value(usrName)->socket, servNotice);

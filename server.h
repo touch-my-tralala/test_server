@@ -72,6 +72,7 @@ private:
     QJsonParseError jsonErr;
     QMap<QString, UserInf*>  m_userList; // FIXME можно без qsharedpointer
     QMap<quint8, ResInf*>  m_resList; // имя ресурса - текущий пользователь
+    QMap<QString, QJsonArray*> m_grabRes; // имя пользователя - лист ресурсов, которые у него забрали
     QSet<QHostAddress>  m_blockIp;
     QMutex mutex;
     QString startServTime;
