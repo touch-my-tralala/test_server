@@ -117,7 +117,7 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
                 return;
             }
             // отправка всем пользователям актуальной инфы
-            send_to_all_clients();
+            // send_to_all_clients();
         }else{ // Если нет, то штраф сердечко
             m_blockIp.insert(clientIp);
             QJsonObject jObj;
@@ -152,8 +152,9 @@ void Server::slotDisconnected(){
 
 
 // Первое подключение пользователя. Ему отправляется время старта сервера и список ресурсов и кто их занимает и время.
-void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName){
-    m_userList.value(newUsrName)->socket = &sock; // FIXME здесь норм &??
+void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName){    
+    m_userList[newUsrName]->socket = &sock; // FIXME здесь норм &??
+
     QJsonObject jObj;
     QJsonArray resNum, resUser, resTime;
     for(quint8 i=0; i<m_resList.size(); i++){
@@ -167,6 +168,7 @@ void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName
     jObj.insert("resuser", resUser);
     jObj.insert("busyTime", resTime);
     send_to_client(sock, jObj);
+    //send_to_client(*m_userList[newUsrName]->socket, jObj); // тоже работает
 }
 
 
@@ -175,15 +177,15 @@ void Server::all_res_clear(){
     QJsonObject jObj;
     QString usrName;
     for(quint8 i = 0; i < m_resList.size(); ++i){
-        if(m_resList.value(i)->currenUser != "Free"){
+        if(m_resList[i]->currenUser != "Free"){
             usrName = m_resList.value(i)->currenUser;
             if(m_grabRes.contains(usrName)){
                 m_grabRes[usrName]->push_back(i);
             }else{
                 m_grabRes.insert(usrName, new QJsonArray);
                 m_grabRes[usrName]->push_back(i);
-            m_resList.value(i)->currenUser = "Free";
-            m_resList.value(i)->time = nullptr;
+            m_resList[i]->currenUser = "Free";
+            m_resList[i]->time = nullptr;
             }
         }
     }
@@ -224,7 +226,7 @@ void Server::service_handler(const QJsonObject &jObj){
 void Server::res_req_handler(const QJsonObject &jobj){
     QJsonObject servNotice; // Ответ сервера обратившемуся клиенту
     QJsonArray resNum, resStatus;
-    quint32 usrTime = static_cast<quint32>(jobj["time"].toInt());
+    quint64 usrTime = static_cast<quint64>(jobj["time"].toInt());
     quint32 reqRes = static_cast<quint32>(jobj["request"].toInt());
     quint32 curRes;
     if(jobj["action"].toString() == "take"){
@@ -277,7 +279,7 @@ void Server::res_req_handler(const QJsonObject &jobj){
 //            servNotice.insert("username", usrName); // FIXME это надо?
             servNotice.insert("resource", resNum);
             servNotice.insert("status", resStatus);
-            send_to_client(*m_userList.value(usrName)->socket, servNotice);
+            send_to_client(*m_userList[usrName]->socket, servNotice);
     }else if(jobj["action"].toString() == "free"){
         for(quint8 i=0; i<m_resList.size(); i++){
             curRes = (reqRes >> (i*8)) & 0xFF;
@@ -292,7 +294,7 @@ void Server::res_req_handler(const QJsonObject &jobj){
 
 
 void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
-    if(sock.state() == QTcpSocket::ConnectedState){
+    if(sock.state() == QAbstractSocket::ConnectedState){
         QJsonDocument jDoc(jObj);
         sock.write(jDoc.toJson());
     }else{
@@ -314,13 +316,18 @@ void Server::send_to_all_clients(){
     jObj.insert("resnum", resNum);
     jObj.insert("resuser", resUser);
     jObj.insert("busyTime", resTime);
-    QJsonDocument jDoc(jObj);
-    for(auto i : m_userList){
-        if(i->socket->state() == QTcpSocket::ConnectedState){
-            i->socket->write(jDoc.toJson());
-        }
 
+    QJsonDocument jDoc(jObj);
+    if( m_userList["egor"]->socket->isValid() ){
+        m_userList["egor"]->socket->write(jDoc.toJson());
     }
+
+//    QJsonDocument jDoc(jObj);
+//    for(auto i : m_userList){
+//        if(i->socket && i->socket->isValid()){
+//            i->socket->write(jDoc.toJson());
+//        }
+//    }
 }
 
 

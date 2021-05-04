@@ -19,7 +19,7 @@ class Server: public QObject
     Q_OBJECT
 
     struct UserInf{
-        QTcpSocket* socket;
+        QTcpSocket* socket = nullptr;
         QTime* time = nullptr;
         quint64 request = 0;
     };
