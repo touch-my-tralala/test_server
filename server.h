@@ -19,16 +19,21 @@ class Server: public QObject
     Q_OBJECT
 
     struct UserInf{
+        UserInf(){}
+        ~UserInf(){
+            time = nullptr;
+        }
+
         QTcpSocket* socket = nullptr;
         QTime* time = nullptr;
         quint64 request = 0;
+
     };
 
     struct ResInf{
-        ResInf(){}
-        ResInf(quint32 usrTime, QString username){
-            time = new QTime(usrTime/3600, (usrTime%3600)/60, usrTime%60); // FIXME можно убрать qsharedpointer
-            currenUser = username;
+        ResInf(){
+            time = new QTime();
+            time->setHMS(0, 0, 0);
         }
         ~ResInf(){
             delete time;
@@ -51,11 +56,12 @@ public slots:
 private:
     void ini_parse(QString fname);
     void send_to_client(QTcpSocket &sock, const QJsonObject &jObj);
-    void send_to_all_clients();
+    void send_to_all_clients(const QString usrName);
     bool registr(const std::string &username, uint32_t resource_index);
     void json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket);
     void all_res_clear();
-    void res_req_handler(const QJsonObject &jObj);
+    void res_req_take(const QJsonObject &jObj);
+    void res_req_free(const QJsonObject &jObj);
     void service_handler(const QJsonObject &jObj);
     void new_client_autorization(QTcpSocket &sock, const QString &newUsrName);
 
