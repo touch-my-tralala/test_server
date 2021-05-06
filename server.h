@@ -56,7 +56,7 @@ public slots:
 private:
     void ini_parse(QString fname);
     void send_to_client(QTcpSocket &sock, const QJsonObject &jObj);
-    void send_to_all_clients(const QString usrName);
+    void send_to_all_clients();
     bool registr(const std::string &username, uint32_t resource_index);
     void json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket);
     void all_res_clear();

@@ -158,7 +158,7 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
                 return;
             }
             // отправка всем пользователям актуальной инфы
-            send_to_all_clients(usrName);
+            send_to_all_clients();
         }else{ // Если нет, то штраф сердечко
             m_blockIp.insert(clientIp);
             QJsonObject jObj;
@@ -294,9 +294,6 @@ void Server::res_req_take(const QJsonObject &jObj){
     servNotice.insert("action", "take");
     servNotice.insert("resource_responce", resNumReq);
     servNotice.insert("status", resStatus);
-    servNotice.insert("resnum", resNum);
-    servNotice.insert("resuser", resUser);
-    servNotice.insert("busyTime", resTime);
     send_to_client(*m_userList[usrName]->socket, servNotice);
 }
 
@@ -349,7 +346,7 @@ void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
 
 
 // Обновление данных о ресурсах/пользователях у всех клиентов. Наверное так делать не совсем верно.
-void Server::send_to_all_clients(const QString usrName){
+void Server::send_to_all_clients(){
     QJsonObject jObj;
     QJsonArray resNum, resUser, resTime;
     for(quint8 i=0; i<m_resList.size(); i++){
@@ -364,12 +361,12 @@ void Server::send_to_all_clients(const QString usrName){
 
 
     QJsonDocument jDoc(jObj);
-    QMap<QString, UserInf*>::const_iterator i;
     // если: 1)сокет не nullptr, 2)подключен и 3)это не пользователь, который инициализировал запрос ресурса.
     // проблема с 3 условием. Если его нет, то почему-то пользователю приходит пустая строка и возникает ошибка "garbage at the end of the document".
     // я так и не смог понять почему так происходит? из-за того что я пытаюсь быстро два раза подряд записать в сокет?
-    for(i = m_userList.begin(); i != m_userList.end(); ++i){
-        if(i.value()->socket && i.value()->socket->state() == QTcpSocket::ConnectedState && i.key() != usrName){
+    for(auto i = m_userList.begin(); i != m_userList.end(); ++i){
+        qDebug() << i.key();
+        if(i.value()->socket && i.value()->socket->state() == QTcpSocket::ConnectedState ){
             i.value()->socket->write(jDoc.toJson());
         }
     }
