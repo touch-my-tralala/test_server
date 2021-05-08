@@ -1,7 +1,7 @@
 #include "server.h"
 
 /* Что осталось доделать:
- * 1) разобраться с doxydoc
+ * 1) разобраться с doxygen
 */
 
 Server::Server()
@@ -91,8 +91,7 @@ void Server::slotReadClient(){
         return;
     }
 
-    // FIXME надо добавить то, что если буфер превышает по размеру какое-то значение полностью его очищать
-    auto jDoc = QJsonDocument::fromJson(buff, &jsonErr);
+    jDoc = QJsonDocument::fromJson(buff, &jsonErr);
     if(jsonErr.error == QJsonParseError::UnterminatedObject){
         qDebug() << jsonErr.errorString();
         return;
@@ -108,12 +107,11 @@ void Server::slotReadClient(){
 void Server::slotDisconnected(){
     QTcpSocket* clientSocket = qobject_cast<QTcpSocket*>(sender());
     qDebug() << clientSocket << " disconnected";
-    // FIXME сначала  удалить указатель из контейнера, потом закрыть сокет правильно, потом удалить сокет.
     for(auto i : m_userList){
-        if(clientSocket == i->socket) // FIXME это сравнение будет нормально работать или сравняться указатели?
+        if(clientSocket == i->socket)
             i->socket = nullptr;
     }
-    clientSocket->abort(); // FIXME возможно здесь надо исользовать close()?
+    clientSocket->abort();
     clientSocket->deleteLater();
 }
 
@@ -135,7 +133,6 @@ void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName
     jObj.insert("resuser", resUser);
     jObj.insert("busyTime", resTime);
     send_to_client(sock, jObj);
-    //send_to_client(*m_userList[newUsrName]->socket, jObj); // тоже работает
 }
 
 
@@ -209,9 +206,8 @@ void Server::all_res_clear(){
             m_resList[i]->time->setHMS(0, 0, 0);
         }
     }
-    QMap<QString, QJsonArray*>::const_iterator i;
     QJsonObject oldUserObj;
-    for(i = m_grabRes.begin(); i != m_grabRes.end(); ++i){
+    for(auto i = m_grabRes.begin(); i != m_grabRes.end(); ++i){
         oldUserObj.insert("type", "grab_res");
         oldUserObj.insert("resource", *i.value());
         send_to_client(*m_userList[i.key()]->socket, oldUserObj);
@@ -350,8 +346,8 @@ void Server::res_req_free(const QJsonObject &jObj){
 
 void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
     if(sock.state() == QAbstractSocket::ConnectedState){
-        QJsonDocument jDoc(jObj);
-        sock.write(jDoc.toJson());
+        QJsonDocument jsonDoc(jObj);
+        sock.write(jsonDoc.toJson());
     }else{
         qDebug() << "Socket not connected";
     }
@@ -372,14 +368,10 @@ void Server::send_to_all_clients(){
     jObj.insert("resuser", resUser);
     jObj.insert("busyTime", resTime);
 
-
-    QJsonDocument jDoc(jObj);
-    // если: 1)сокет не nullptr, 2)подключен и 3)это не пользователь, который инициализировал запрос ресурса.
-    // проблема с 3 условием. Если его нет, то почему-то пользователю приходит пустая строка и возникает ошибка "garbage at the end of the document".
-    // я так и не смог понять почему так происходит? из-за того что я пытаюсь быстро два раза подряд записать в сокет?
+    QJsonDocument jsonDoc(jObj);
     for(auto i = m_userList.begin(); i != m_userList.end(); ++i){
         if(i.value()->socket && i.value()->socket->state() == QTcpSocket::ConnectedState ){
-            i.value()->socket->write(jDoc.toJson());
+            i.value()->socket->write(jsonDoc.toJson());
         }
     }
 }

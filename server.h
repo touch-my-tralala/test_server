@@ -67,22 +67,25 @@ private:
     void time_out(QTcpSocket &sock);
 
 private:
+    // params
     const qint64 numReadByte = 32;
     quint32 m_nextBlock = 0;
-    QByteArray buff;
-    bool reject_res_req = false;
     quint16 port;
     quint8 maxUsers;
+    // service
     qint64 maxBusyTime = 7200; // 2 часа
+    bool reject_res_req = false;
+
+    QByteArray buff;
     QSharedPointer< QTcpServer > m_server;    
-    QJsonDocument jsonDoc;
-    QJsonParseError jsonErr;
     QMap<QString, UserInf*>  m_userList; // FIXME можно без qsharedpointer
     QMap<quint8, ResInf*>  m_resList; // имя ресурса - текущий пользователь
     QMap<QString, QJsonArray*> m_grabRes; // имя пользователя - лист ресурсов, которые у него забрали
     QSet<QHostAddress>  m_blockIp;
     QMutex mutex;
     QString startServTime;
+    QJsonDocument jDoc;
+    QJsonParseError jsonErr;
 };
 
 #endif // SERVER_H
