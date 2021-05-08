@@ -1,14 +1,14 @@
 #include "server.h"
 
 /* Что осталось доделать:
-    1) кикать полльзователя если он > минуты не присылает свое имя.
+ * 1) разобраться с doxydoc
 */
 
 Server::Server()
 {
     Server::ini_parse("init.ini");
-    qDebug() << "port=" << port;
-    qDebug() << "max_user=" << maxUsers;
+    qDebug() << "port = " << port;
+    qDebug() << "max_user = " << maxUsers;
 
     m_server = QSharedPointer<QTcpServer>(new QTcpServer(this));
     m_server->setMaxPendingConnections(maxUsers);
@@ -43,7 +43,7 @@ void Server::ini_parse(QString fname){
         QStringList iniList = sett.childKeys();
         for (auto i : iniList){
             auto name = sett.value(i, "no_data").toString().toLower();
-            m_userList.insert(name, new UserInf()); // FIXME так норм с указателем?
+            m_userList.insert(name, new UserInf());
         }
         sett.endGroup();
         // Инициализация списка ресурсов. FIXME: Мб стоит использовать имена ресурсов тоже, но пока без этого.
@@ -60,19 +60,21 @@ void Server::ini_parse(QString fname){
 
 
 void Server::slotNewConnection(){
-    QTcpSocket* clientSocket = m_server->nextPendingConnection();
+    QTcpSocket* clientSocket = m_server->nextPendingConnection(); // FIXME эту хрень так оставить или надо удалять?
     qDebug() << "New connection";
-//    connect(clientSocket, &QTcpSocket::disconnected,
-//            clientSocket, &QTcpSocket::deleteLater);
     connect(clientSocket, &QTcpSocket::disconnected,
             this, &Server::slotDisconnected);
     connect(clientSocket, &QTcpSocket::readyRead,
             this, &Server::slotReadClient);
+    // FIXME не уверен, что это будет верно работать. По задумке: если после подключения,
+    // пользователь не шлет данные в течении 30 секунд, то хай теряется отсюда.
+    if(!clientSocket->waitForReadyRead(30000)){
+        clientSocket->abort();
+    }
 }
 
 
 void Server::slotReadClient(){
-    qDebug() << "Ready read";
     QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender()); // FIXME тут надо QSharedPointer?
     qint64 curByteNum = clientSocket->bytesAvailable();
     if(curByteNum <= READ_BLOCK_SIZE){
@@ -82,15 +84,20 @@ void Server::slotReadClient(){
             buff.append( clientSocket->read(READ_BLOCK_SIZE) );
         }
     }
+
+    if(buff.size()*sizeof(buff[0]) > 1000000){
+        qDebug() << "Buffer size > 1 Mb";
+        buff.clear();
+        return;
+    }
+
     // FIXME надо добавить то, что если буфер превышает по размеру какое-то значение полностью его очищать
     auto jDoc = QJsonDocument::fromJson(buff, &jsonErr);
-    qDebug() << jsonErr.errorString();
     if(jsonErr.error == QJsonParseError::UnterminatedObject){
         qDebug() << jsonErr.errorString();
         return;
     }
     if(jsonErr.error == QJsonParseError::NoError){
-        qDebug() << jDoc.toJson();
         auto address = clientSocket->peerAddress();
         json_handler(jDoc.object(), address, *clientSocket);
         buff.clear();
@@ -153,7 +160,13 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
                     qDebug() << "res_request not contain action: " + jObj["action"].toString();
 
             }
-            if(jType == "authorization"){
+            if(jType == "authorization"){                
+                // попытка подключиться по одному и тому же имени клиента нескольким пользователям.
+                if(m_userList[usrName]->socket && m_userList[usrName]->socket->state() == QTcpSocket::ConnectedState){
+                    qDebug() << "User with name " + usrName + " is already connected.";
+                    clientSocket.abort();
+                    return;
+                }
                 new_client_autorization(clientSocket, usrName);
                 return;
             }
@@ -210,7 +223,7 @@ void Server::all_res_clear(){
 // Служебные делишкишы. Установка максимального времени удержания ресурса и блокировка новых соединений.
 void Server::service_handler(const QJsonObject &jObj){
     if(jObj["action"].toString()== "occupancy_time"){
-        maxBusyTime = static_cast<quint64>(jObj["value"].toInt());
+        maxBusyTime = static_cast<qint64>(jObj["value"].toInt());
     }
 
     if(jObj["action"].toString()== "reject_connections"){
@@ -241,10 +254,9 @@ void Server::res_req_take(const QJsonObject &jObj){
     qint64 reqRes = static_cast<qint64>(jObj["request"].toInt());
     qint64 curRes = 0;
     QString usrName = jObj["username"].toString();
-    for(quint8 i=0; i<m_resList.size(); i++){
+    for(qint8 i=0; i<m_resList.size(); i++){
         curRes = (reqRes >> (i*8)) & 0xFF;
         if(curRes){
-            //int diffTime = QTime::currentTime().secsTo(*(m_resList[i]->time)); // так можно делать?
             qint64 diffTime = m_resList[i]->time->secsTo(QTime::currentTime());
             // Если ресурс свободен
             if(m_resList.value(i)->currenUser == "Free" && !reject_res_req){
@@ -254,6 +266,7 @@ void Server::res_req_take(const QJsonObject &jObj){
                 resStatus.push_back(1);
                 // вызов потоко-небезопасной функции
                 registr(usrName.toUtf8().constData(), i);
+            // ресурс занят, но по таймауту можно перехватить
             }else if(diffTime > maxBusyTime && !reject_res_req){
                 QString old_user = m_resList.value(i)->currenUser;
                 m_resList[i]->currenUser = usrName;
@@ -270,6 +283,7 @@ void Server::res_req_take(const QJsonObject &jObj){
                     m_grabRes.insert(old_user, new QJsonArray);
                     m_grabRes[old_user]->push_back(i);
                 }
+            // ресурс занят
             }else{
                 resNumReq.push_back(i);
                 resStatus.push_back(0);
@@ -281,10 +295,9 @@ void Server::res_req_take(const QJsonObject &jObj){
     }
 
     // Отправка всем пользователям у которых забрали ресурс список какие ресурсы у них забрали.
-    QMap<QString, QJsonArray*>::const_iterator i;
     QJsonObject oldUserObj;
-    for(i = m_grabRes.begin(); i != m_grabRes.end(); ++i){
-        oldUserObj.insert("type", "grab_res");
+    oldUserObj.insert("type", "grab_res");
+    for(auto i = m_grabRes.begin(); i != m_grabRes.end(); ++i){
         oldUserObj.insert("resource", *i.value());
         send_to_client(*m_userList[i.key()]->socket, oldUserObj); // эта хуйня сломается наверное при отправке send_all_client
     }
@@ -365,7 +378,6 @@ void Server::send_to_all_clients(){
     // проблема с 3 условием. Если его нет, то почему-то пользователю приходит пустая строка и возникает ошибка "garbage at the end of the document".
     // я так и не смог понять почему так происходит? из-за того что я пытаюсь быстро два раза подряд записать в сокет?
     for(auto i = m_userList.begin(); i != m_userList.end(); ++i){
-        qDebug() << i.key();
         if(i.value()->socket && i.value()->socket->state() == QTcpSocket::ConnectedState ){
             i.value()->socket->write(jDoc.toJson());
         }
