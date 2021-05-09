@@ -26,35 +26,159 @@ Server::Server()
 }
 
 Server::~Server(){
+    QStringList saveList;
+    for(auto i = m_resList.begin(); i != m_resList.end(); i++){
+        saveList << QString::number(i.key());
+    }
+    sett->setValue("RESOURCE_LIST", saveList);
+    saveList.clear();
+    for(auto i =m_userList.begin(); i != m_userList.end(); i++){
+        saveList << i.key();
+    }
+    sett->setValue("USER_LIST", saveList);
+
     if(m_server->isListening()){
         m_server->close();
     }
 }
 
-void Server::ini_parse(QString fname){
-    QSettings sett(QDir::currentPath() + "/" + fname, QSettings::IniFormat);
-    if(sett.isWritable()){
-        sett.setIniCodec("UTF-8");
-        port = static_cast<quint16>(sett.value("SERVER_SETTINGS/port", 9999).toUInt());
-        maxUsers = static_cast<quint8>(sett.value("SERVER_SETTINGS/max_user", 5).toUInt());
+void Server::setTimeOut(qint64 secs){
+    maxBusyTime = secs;
+}
 
+void Server::setMaxUser(quint8 maxUsers){
+    this->maxUsers = maxUsers;
+}
+
+void Server::setRejectConnection(bool a){
+    if(a)
+        m_server->pauseAccepting();
+    else
+        m_server->resumeAccepting();
+}
+
+void Server::setRejectResReq(bool a){
+    reject_res_req = a;
+}
+
+QList<quint8> Server::getResList(){
+    QList<quint8> resList;
+    for(auto i = 0; i < m_resList.size(); i++){
+        resList << i;
+    }
+    return resList;
+}
+
+QString Server::getResUser(quint8 resNum){
+    if(m_resList.contains(resNum))
+        return m_resList[resNum]->currentUser;
+    else
+        return "not contain a key";
+}
+
+// возвращает время в секундах прошедшее с момента занятия ресурса
+qint64 Server::getBusyResTime(quint8 resNum){
+    if(m_resList.contains(resNum)){
+        if(m_resList[resNum]->currentUser == "Free")
+            return 0;
+        else
+            return m_resList[resNum]->time->secsTo(QTime::currentTime());
+    }else{
+        return -1;
+    }
+}
+
+void Server::allResClear(){
+    QJsonObject jObj;
+    QString usrName;
+    for(quint8 i = 0; i < m_resList.size(); ++i){
+        if(m_resList[i]->currentUser != "Free"){
+            usrName = m_resList.value(i)->currentUser;
+            if(m_grabRes.contains(usrName)){
+                m_grabRes[usrName]->push_back(i);
+            }else{
+                m_grabRes.insert(usrName, new QJsonArray);
+                m_grabRes[usrName]->push_back(i);
+            }
+            m_resList[i]->currentUser = "Free";
+            m_resList[i]->time->setHMS(0, 0, 0);
+        }
+    }
+    QJsonObject oldUserObj;
+    for(auto i = m_grabRes.begin(); i != m_grabRes.end(); ++i){
+        oldUserObj.insert("type", "grab_res");
+        oldUserObj.insert("resource", *i.value());
+        send_to_client(*m_userList[i.key()]->socket, oldUserObj);
+    }
+    m_grabRes.clear();
+}
+
+void Server::addNewRes(quint8 resNum){
+    if(!m_resList.contains(resNum)){
+        m_resList.insert(resNum, new ResInf());
+    }
+}
+
+void Server::addNewUsrName(QString name){
+    if(!m_userList.contains(name)){
+        m_userList.insert(name, new UserInf());
+    }
+}
+
+void Server::removeRes(quint8 resNum){
+    if(m_resList.contains(resNum)){
+        m_resList.remove(resNum);
+    }
+}
+
+void Server::removeUsr(QString name){
+    if(m_userList.contains(name)){
+        m_userList.remove(name);
+    }
+}
+
+
+void Server::ini_parse(QString fname){
+    //QSettings sett(QDir::currentPath() + "/" + fname, QSettings::IniFormat);
+    sett = QSharedPointer<QSettings>(new QSettings(QDir::currentPath() + "/" + fname, QSettings::IniFormat));
+    if(sett->isWritable()){
+        sett->setIniCodec("UTF-8");
+
+        if(sett->contains("SERVER_SETTINGS/port")){
+            port = static_cast<quint16>(sett->value("SERVER_SETTINGS/port", 9292).toUInt());
+        }else{
+            port = 9292;
+            sett->setValue("SERVER_SETTINGS/port", 9292);
+        }
+
+        if(sett->contains("SERVER_SETTINGS/max_user")){
+            maxUsers = static_cast<quint8>(sett->value("SERVER_SETTINGS/max_user", 5).toUInt());
+        }else{
+            maxUsers = 5;
+            sett->setValue("SERVER_SETTINGS/max_user", 5);
+        }
+        QStringList iniList;
         // Инициализация списка разрешенных пользователей
-        sett.beginGroup("USER_LIST");
-        QStringList iniList = sett.childKeys();
-        for (auto i : iniList){
-            auto name = sett.value(i, "no_data").toString().toLower();
-            m_userList.insert(name, new UserInf());
+        if(sett->contains("USER_LIST")){
+            sett->beginGroup("USER_LIST");
+             iniList = sett->childKeys();
+            for (auto i : iniList){
+                auto name = sett->value(i, "no_data").toString().toLower();
+                m_userList.insert(name, new UserInf());
+            }
+            sett->endGroup();
         }
-        sett.endGroup();
-        // Инициализация списка ресурсов. FIXME: Мб стоит использовать имена ресурсов тоже, но пока без этого.
-        sett.beginGroup("RESOURCE_LIST");
-        iniList = sett.childKeys();
-        for(quint8 i=0; i<iniList.size(); i++){
-            m_resList.insert(i, new ResInf());
+
+        if(sett->contains("RESOURCE_LIST")){
+            sett->beginGroup("RESOURCE_LIST");
+            iniList = sett->childKeys();
+            for(quint8 i=0; i<iniList.size(); i++){
+                m_resList.insert(i, new ResInf());
+            }
+            sett->endGroup();
         }
-        sett.endGroup();
    }else{
-        qDebug() << "ini file cant oppen";
+        qDebug() << "ini is read-only";
     }
 }
 
@@ -116,66 +240,30 @@ void Server::slotDisconnected(){
 }
 
 
-// Первое подключение пользователя. Ему отправляется время старта сервера и список ресурсов и кто их занимает и время.
-void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName){    
-    m_userList[newUsrName]->socket = &sock; // FIXME здесь норм &??
-
-    QJsonObject jObj;
-    QJsonArray resNum, resUser, resTime;
-    for(quint8 i=0; i<m_resList.size(); i++){
-        resNum.push_back(i);
-        resUser.push_back(m_resList[i]->currenUser);
-        resTime.push_back(m_resList[i]->time->toString("hh:mm:ss"));
-    }
-    jObj.insert("type", "authorization");
-    jObj.insert("start_time", startServTime);
-    jObj.insert("resnum", resNum);
-    jObj.insert("resuser", resUser);
-    jObj.insert("busyTime", resTime);
-    send_to_client(sock, jObj);
-}
-
-
 void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket){
     if(!m_blockIp.contains(clientIp)){
-        auto usrName = jObj["username"].toString();
-        if( m_userList.contains(usrName) ){ // Если имя клиента есть в списке
-            qDebug() << "Name correct";
-            auto jType = jObj["type"].toString();
-            if(jType == "clear_res"){   // FIXME можно сделать enum по индексам и через switch  либо через мапу
-                all_res_clear();
-            }
-            if(jType == "service_info"){
-                service_handler(jObj);
-            }
-            if(jType == "res_request"){
+        QString name = jObj["username"].toString();
+        if(m_userList.contains(name)){ // Если имя клиента есть в списке
+
+            if(!jObj.contains("action")){
+                new_client_autorization(clientSocket, name);
+            }else{
                 if(jObj["action"].toString() == "take")
                     res_req_take(jObj);
                 else if(jObj["action"].toString() == "free")
                     res_req_free(jObj);
                 else
                     qDebug() << "res_request not contain action: " + jObj["action"].toString();
-
-            }
-            if(jType == "authorization"){                
-                // попытка подключиться по одному и тому же имени клиента нескольким пользователям.
-                if(m_userList[usrName]->socket && m_userList[usrName]->socket->state() == QTcpSocket::ConnectedState){
-                    qDebug() << "User with name " + usrName + " is already connected.";
-                    clientSocket.abort();
-                    return;
-                }
-                new_client_autorization(clientSocket, usrName);
-                return;
             }
             // отправка всем пользователям актуальной инфы
             send_to_all_clients();
-        }else{ // Если нет, то штраф сердечко
+
+        }else{
             m_blockIp.insert(clientIp);
             QJsonObject jObj;
             jObj.insert("type", "connect_fail");
             send_to_client(clientSocket, jObj);
             clientSocket.abort();
-            // Отправка qmessagebox о том что сосать, а не подключение
             qDebug() << "User is not contained in list";
         }
     }else{
@@ -189,52 +277,22 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
 }
 
 
-// Очистка всех ресурсов от пользователей и отправка уведомлений о том что ресурс забрали.
-void Server::all_res_clear(){
+// Первое подключение пользователя. Ему отправляется время старта сервера и список ресурсов и кто их занимает и время.
+void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName){
+    m_userList[newUsrName]->socket = &sock; // FIXME здесь норм &??
+
     QJsonObject jObj;
-    QString usrName;
-    for(quint8 i = 0; i < m_resList.size(); ++i){
-        if(m_resList[i]->currenUser != "Free"){
-            usrName = m_resList.value(i)->currenUser;
-            if(m_grabRes.contains(usrName)){
-                m_grabRes[usrName]->push_back(i);
-            }else{
-                m_grabRes.insert(usrName, new QJsonArray);
-                m_grabRes[usrName]->push_back(i);
-            }
-            m_resList[i]->currenUser = "Free";
-            m_resList[i]->time->setHMS(0, 0, 0);
-        }
+    QJsonArray resNum, resUser, resTime;
+    for(quint8 i=0; i<m_resList.size(); i++){
+        resNum.push_back(i);
+        resUser.push_back(m_resList[i]->currentUser);
+        resTime.push_back(m_resList[i]->time->toString("hh:mm:ss"));
     }
-    QJsonObject oldUserObj;
-    for(auto i = m_grabRes.begin(); i != m_grabRes.end(); ++i){
-        oldUserObj.insert("type", "grab_res");
-        oldUserObj.insert("resource", *i.value());
-        send_to_client(*m_userList[i.key()]->socket, oldUserObj);
-    }
-    m_grabRes.clear();
-}
-
-
-// Служебные делишкишы. Установка максимального времени удержания ресурса и блокировка новых соединений.
-void Server::service_handler(const QJsonObject &jObj){
-    if(jObj["action"].toString()== "occupancy_time"){
-        maxBusyTime = static_cast<qint64>(jObj["value"].toInt());
-    }
-
-    if(jObj["action"].toString()== "reject_connections"){
-        if(jObj["value"].toInt())
-            m_server->pauseAccepting();
-        else
-            m_server->resumeAccepting();
-    }
-
-    if(jObj["action"].toString()== "reject_res_req"){
-        if(jObj["value"].toInt())
-            reject_res_req = true;
-        else
-            reject_res_req = false;
-    }
+    jObj.insert("type", "authorization");
+    jObj.insert("resnum", resNum);
+    jObj.insert("resuser", resUser);
+    jObj.insert("busyTime", resTime);
+    send_to_client(sock, jObj);
 }
 
 
@@ -255,8 +313,8 @@ void Server::res_req_take(const QJsonObject &jObj){
         if(curRes){
             qint64 diffTime = m_resList[i]->time->secsTo(QTime::currentTime());
             // Если ресурс свободен
-            if(m_resList.value(i)->currenUser == "Free" && !reject_res_req){
-                m_resList[i]->currenUser = usrName;
+            if(m_resList.value(i)->currentUser == "Free" && !reject_res_req){
+                m_resList[i]->currentUser = usrName;
                 m_resList[i]->time->setHMS(usrTime/3600, (usrTime%3600)/60, usrTime%60);
                 resNumReq.push_back(i);
                 resStatus.push_back(1);
@@ -264,8 +322,8 @@ void Server::res_req_take(const QJsonObject &jObj){
                 registr(usrName.toUtf8().constData(), i);
             // ресурс занят, но по таймауту можно перехватить
             }else if(diffTime > maxBusyTime && !reject_res_req){
-                QString old_user = m_resList.value(i)->currenUser;
-                m_resList[i]->currenUser = usrName;
+                QString old_user = m_resList.value(i)->currentUser;
+                m_resList[i]->currentUser = usrName;
                 m_resList[i]->time->setHMS(usrTime/3600, (usrTime%3600)/60, usrTime%60);
                 resNumReq.push_back(i);
                 resStatus.push_back(1);
@@ -286,7 +344,7 @@ void Server::res_req_take(const QJsonObject &jObj){
             }
         }
         resNum.push_back(i);
-        resUser.push_back(m_resList[i]->currenUser);
+        resUser.push_back(m_resList[i]->currentUser);
         resTime.push_back(m_resList[i]->time->toString("hh:mm:ss"));
     }
 
@@ -320,17 +378,17 @@ void Server::res_req_free(const QJsonObject &jObj){
     QString usrName = jObj["username"].toString();
     for(quint8 i=0; i<m_resList.size(); i++){
         curRes = (reqRes >> (i*8)) & 0xFF;
-        if(curRes && m_resList[i]->currenUser == usrName){
-            m_resList[i]->currenUser = "Free";
+        if(curRes && m_resList[i]->currentUser == usrName){
+            m_resList[i]->currentUser = "Free";
             m_resList[i]->time->setHMS(0, 0, 0);
             resNumReq.push_back(i);
             resStatus.push_back(1);
-        }else{
+        }else if(curRes){
             resNumReq.push_back(i);
             resStatus.push_back(0);
         }
         resNum.push_back(i);
-        resUser.push_back(m_resList[i]->currenUser);
+        resUser.push_back(m_resList[i]->currentUser);
         resTime.push_back(m_resList[i]->time->toString("hh:mm:ss"));
     }
     servNotice.insert("type", "request_responce");
@@ -360,7 +418,7 @@ void Server::send_to_all_clients(){
     QJsonArray resNum, resUser, resTime;
     for(quint8 i=0; i<m_resList.size(); i++){
         resNum.push_back(QJsonValue(i));
-        resUser.push_back(QJsonValue(m_resList.value(i)->currenUser));
+        resUser.push_back(QJsonValue(m_resList.value(i)->currentUser));
         resTime.push_back(QJsonValue(m_resList.value(i)->time->toString("hh:mm:ss")));
     }
     jObj.insert("type", "broadcast");

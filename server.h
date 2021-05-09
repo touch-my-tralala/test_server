@@ -21,6 +21,7 @@ class Server: public QObject
     struct UserInf{
         UserInf(){}
         ~UserInf(){
+            delete time;
             time = nullptr;
         }
 
@@ -41,14 +42,26 @@ class Server: public QObject
         }
 
         QTime* time = nullptr;
-        QString currenUser = "Free";
+        QString currentUser = "Free";
     };
 
 public:
     Server();
     ~Server();
+    void setTimeOut(qint64 secs);
+    void setMaxUser(quint8 maxUser);
+    void setRejectConnection(bool a);
+    void setRejectResReq(bool a);
+    QList<quint8> getResList();
+    QString getResUser(quint8 resNum);
+    qint64 getBusyResTime(quint8 resNum);
+    void allResClear();
+    void addNewRes(quint8 resNum);
+    void addNewUsrName(QString name);
+    void removeRes(quint8 resNum);
+    void removeUsr(QString name);
 
-public slots:
+private slots:
     void slotNewConnection();
     void slotReadClient();
     void slotDisconnected();
@@ -59,15 +72,13 @@ private:
     void send_to_all_clients();
     bool registr(const std::string &username, uint32_t resource_index);
     void json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket);
-    void all_res_clear();
     void res_req_take(const QJsonObject &jObj);
     void res_req_free(const QJsonObject &jObj);
-    void service_handler(const QJsonObject &jObj);
     void new_client_autorization(QTcpSocket &sock, const QString &newUsrName);
-    void time_out(QTcpSocket &sock);
 
 private:
     // params
+    QSharedPointer<QSettings> sett;
     const qint64 numReadByte = 32;
     quint32 m_nextBlock = 0;
     quint16 port;
