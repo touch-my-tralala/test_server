@@ -71,5 +71,6 @@ Thumbs.db
 *.dll
 *.exe
 
-/build-test_server-Desktop_Qt_5_13_0_MinGW_32_bit-Debug
+/build
+
 
