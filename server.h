@@ -20,30 +20,28 @@ class Server: public QObject
 
     struct UserInf{
         UserInf(){}
-        ~UserInf(){
-            delete time;
-            time = nullptr;
-        }
+        ~UserInf(){}
 
         QTcpSocket* socket = nullptr;
-        QTime* time = nullptr;
+        QTime time;
         quint64 request = 0;
 
     };
 
     struct ResInf{
-        ResInf(){
-            time = new QTime();
-            time->setHMS(0, 0, 0);
-        }
-        ~ResInf(){
-            delete time;
-            time = nullptr;
-        }
+        ResInf(){}
+        ~ResInf(){}
 
-        QTime* time = nullptr;
+        QTime time;
         QString currentUser = "Free";
     };
+/*
+public:
+    struct Keys{
+        const QString port = "port";
+        const QString max_user = "max_user";
+        const QString
+    }; */
 
 public:
     Server();
@@ -62,9 +60,9 @@ public:
     void removeUsr(QString name);
 
 private slots:
-    void slotNewConnection();
-    void slotReadClient();
-    void slotDisconnected();
+    void on_slotNewConnection();
+    void on_slotReadClient();
+    void on_slotDisconnected();
 
 private:
     void ini_parse(QString fname);
@@ -78,25 +76,25 @@ private:
 
 private:
     // params
-    QSharedPointer<QSettings> sett;
+    qint64 maxBusyTime = 7200; // 2 часа
     const qint64 numReadByte = 32;
     quint32 m_nextBlock = 0;
     quint16 port;
     quint8 maxUsers;
-    // service
-    qint64 maxBusyTime = 7200; // 2 часа
     bool reject_res_req = false;
 
-    QByteArray buff;
-    QSharedPointer< QTcpServer > m_server;    
-    QMap<QString, UserInf*>  m_userList; // FIXME можно без qsharedpointer
-    QMap<quint8, ResInf*>  m_resList; // имя ресурса - текущий пользователь
-    QMap<QString, QJsonArray*> m_grabRes; // имя пользователя - лист ресурсов, которые у него забрали
-    QSet<QHostAddress>  m_blockIp;
     QMutex mutex;
+    QTcpServer m_server;
+
+    QSettings sett;
+    QMap<QString, UserInf>  m_userList; // FIXME можно без qsharedpointer
+    QMap<quint8, ResInf>  m_resList; // имя ресурса - текущий пользователь
+    QMap<QString, QJsonArray> m_grabRes; // имя пользователя - лист ресурсов, которые у него забрали
+    QSet<QHostAddress>  m_blockIp;
     QString startServTime;
     QJsonDocument jDoc;
     QJsonParseError jsonErr;
+    QByteArray buff;
 };
 
 #endif // SERVER_H

@@ -14,15 +14,9 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
     struct ResInf{
-        ResInf(){
-            time = new QTime();
-            time->setHMS(0, 0, 0);
-        }
-        ~ResInf(){
-            delete time;
-            time = nullptr;
-        }
-        QTime* time = nullptr;
+        ResInf(){}
+        ~ResInf(){}
+        QTime time;
         QString currentUser = "Free";
     };
 
@@ -38,12 +32,11 @@ private slots:
     void on_timeoutBtn_clicked();
 
 private:
-    Ui::MainWindow *ui;
-    QSharedPointer<QDateTime> date_time;
-    QSharedPointer<Server> server;
-    QSharedPointer<QTimer> timer;
-    QMap<quint8, ResInf*> res_inf;
     qint64 busyTime;
-    qint64 hh, mm, ss;
+    Ui::MainWindow *ui;
+    QDateTime date_time;
+    Server server;
+    QTimer timer;
+    QMap<quint8, ResInf> res_inf;
 };
 #endif // MAINWINDOW_H
