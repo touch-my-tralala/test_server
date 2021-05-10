@@ -199,6 +199,10 @@ void Server::slotNewConnection(){
 
 
 void Server::slotReadClient(){
+    /// NOTE: Не работает пока...
+    /// Чтобы понять в чём дело (если уж решил идти этим путем)
+    /// - следует обрабатывать все кейсы обработки ошибок
+
     QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender()); // FIXME тут надо QSharedPointer?
     qint64 curByteNum = clientSocket->bytesAvailable();
     if(curByteNum <= READ_BLOCK_SIZE){
@@ -216,6 +220,30 @@ void Server::slotReadClient(){
     }
 
     jDoc = QJsonDocument::fromJson(buff, &jsonErr);
+
+    /// NOTE: (немного поправил твой код для примера того, как это можно сделать)
+    switch (jsonErr.error) {
+        case(QJsonParseError::UnterminatedObject):{
+            qDebug() << jsonErr.errorString();
+            return;
+        }
+        case(QJsonParseError::NoError):{
+            auto address = clientSocket->peerAddress();
+            json_handler(jDoc.object(), address, *clientSocket);
+            buff.clear();
+            break;
+        }
+        ///NOTE: You should resolve this unprocessed message
+        default:{
+            auto str = QString("Recived msg.size(): %2, msg: %1")
+                               .arg(QString(buff))
+                               .arg(buff.size()).toUtf8();
+            qDebug() << str; //
+            break;
+        }
+    }
+
+    /*
     if(jsonErr.error == QJsonParseError::UnterminatedObject){
         qDebug() << jsonErr.errorString();
         return;
@@ -224,7 +252,7 @@ void Server::slotReadClient(){
         auto address = clientSocket->peerAddress();
         json_handler(jDoc.object(), address, *clientSocket);
         buff.clear();
-    }
+    }*/
 }
 
 

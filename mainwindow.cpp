@@ -16,6 +16,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(timer.data(), &QTimer::timeout, this, &MainWindow::time_out);
 
     server = QSharedPointer<Server>(new Server());
+    /// NOTE: вся логика касающаяся сервера должна быть реализона в самой библиотеке сервера.
+    /// можно вынести отдельные публичные методы (если необходимо) для контроля
+    /// или подписаться на сигналы от сервера (например, в целях логирования)
     server->setMaxUser(20);
     QList<quint8> resList = server->getResList();
     for(auto i: resList){
