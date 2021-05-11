@@ -22,7 +22,7 @@ class MainWindow : public QMainWindow
 
 public:
     MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+    ~MainWindow() override;
 
 private slots:
     void time_out();
@@ -32,7 +32,7 @@ private slots:
     void on_timeoutBtn_clicked();
 
 private:
-    qint64 busyTime;
+    qint32 busyTime;
     Ui::MainWindow *ui;
     QDateTime date_time;
     Server server;

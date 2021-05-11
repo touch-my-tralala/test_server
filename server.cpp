@@ -1,7 +1,10 @@
 #include "server.h"
 
 /* Что осталось доделать:
- * 1) разобраться с doxygen
+ * 1) лог
+ * 2) время последней транзакции от клиента
+ * 3) вместо строчных литералов сделать структуру ключей
+ * 4) заполнение ini файла не верно работает.
 */
 
 Server::Server()
@@ -63,7 +66,7 @@ void Server::setRejectResReq(bool a){
 QList<quint8> Server::getResList(){
     QList<quint8> resList;
     for(auto i = 0; i < m_resList.size(); i++){
-        resList << i;
+        resList << static_cast<quint8>(i);
     }
     return resList;
 }
@@ -76,7 +79,7 @@ QString Server::getResUser(quint8 resNum){
 }
 
 // возвращает время в секундах прошедшее с момента занятия ресурса
-qint64 Server::getBusyResTime(quint8 resNum){
+qint32 Server::getBusyResTime(quint8 resNum){
     if(m_resList.contains(resNum)){
         if(m_resList[resNum].currentUser == "Free")
             return 0;
@@ -93,20 +96,16 @@ void Server::allResClear(){
     for(quint8 i = 0; i < m_resList.size(); ++i){
         if(m_resList[i].currentUser != "Free"){
             usrName = m_resList.value(i).currentUser;
-            // FIXME это можно поменять на одну строчку как-то, используя QJsonArray
-            if(m_grabRes.contains(usrName)){
-                m_grabRes[usrName].push_back(i);
-            }else{
-                m_grabRes.insert(usrName, QJsonArray());
-                m_grabRes[usrName].push_back(i);
-            }
+            // FIXME проверить будет ли работать.
+            m_grabRes[usrName].push_back(i);
             m_resList[i].currentUser = "Free";
             m_resList[i].time.setHMS(0, 0, 0);
         }
     }
-    QJsonObject oldUserObj;
-    for(auto i = m_grabRes.begin(); i != m_grabRes.end(); ++i){
-        oldUserObj.insert("type", "grab_res");
+    QJsonObject oldUserObj({
+                           {"type", "grab_res"}
+                           });
+    for(auto i = m_grabRes.begin(); i != m_grabRes.end(); ++i){        
         oldUserObj.insert("resource", i.value());
         send_to_client(*m_userList[i.key()].socket, oldUserObj);
     }
@@ -139,30 +138,31 @@ void Server::removeUsr(QString name){
 
 
 void Server::ini_parse(QString fname){
-    //QSettings sett(QDir::currentPath() + "/" + fname, QSettings::IniFormat);
     sett.setPath(QSettings::IniFormat, QSettings::UserScope,  QDir::currentPath() + "/" + fname); // FIXME хз на счет scope
     if(sett.isWritable()){
         sett.setIniCodec("UTF-8");
-
-        if(sett.contains("SERVER_SETTINGS/port")){
-            port = static_cast<quint16>(sett.value("SERVER_SETTINGS/port", 9292).toUInt());
+        sett.beginGroup("SERVER_SETTINGS");
+        if(sett.contains("port")){
+            port = static_cast<quint16>(sett.value("port", 9292).toUInt());
         }else{
             port = 9292;
-            sett.setValue("SERVER_SETTINGS/port", 9292);
+            sett.setValue("port", 9292);
         }
 
-        if(sett.contains("SERVER_SETTINGS/max_user")){
-            maxUsers = static_cast<quint8>(sett.value("SERVER_SETTINGS/max_user", 5).toUInt());
+        if(sett.contains("max_user")){
+            maxUsers = static_cast<quint8>(sett.value("max_user", 5).toUInt());
         }else{
             maxUsers = 5;
-            sett.setValue("SERVER_SETTINGS/max_user", 5);
+            sett.setValue("max_user", 5);
         }
+        sett.endGroup();
+
         QStringList iniList;
         // Инициализация списка разрешенных пользователей
         if(sett.contains("USER_LIST")){
             sett.beginGroup("USER_LIST");
              iniList = sett.childKeys();
-            for (auto i : iniList){
+            for (QString &i : iniList){
                 auto name = sett.value(i, "no_data").toString().toLower();
                 m_userList.insert(name, UserInf());
             }
@@ -190,16 +190,11 @@ void Server::on_slotNewConnection(){
             this, &Server::on_slotDisconnected);
     connect(clientSocket, &QTcpSocket::readyRead,
             this, &Server::on_slotReadClient);
-    // FIXME не уверен, что это будет верно работать. По задумке: если после подключения,
-    // пользователь не шлет данные в течении 30 секунд, то хай теряется отсюда.
-    if(!clientSocket->waitForReadyRead(30000)){
-        clientSocket->abort();
-    }
 }
 
 
 void Server::on_slotReadClient(){
-    QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender()); // FIXME тут надо QSharedPointer?
+    QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender());
     qint64 curByteNum = clientSocket->bytesAvailable();
     if(curByteNum <= READ_BLOCK_SIZE){
         buff.append(clientSocket->read(curByteNum));
@@ -209,21 +204,19 @@ void Server::on_slotReadClient(){
         }
     }
 
-    if(buff.size()*sizeof(buff[0]) > 1000000){
+    if(buff.size() > 1048576){
         qDebug() << "Buffer size > 1 Mb";
         buff.clear();
         return;
     }
 
     jDoc = QJsonDocument::fromJson(buff, &jsonErr);
-    if(jsonErr.error == QJsonParseError::UnterminatedObject){
-        qDebug() << jsonErr.errorString();
-        return;
-    }
     if(jsonErr.error == QJsonParseError::NoError){
         auto address = clientSocket->peerAddress();
         json_handler(jDoc.object(), address, *clientSocket);
         buff.clear();
+    }else{
+        qDebug() << jsonErr.errorString();
     }
 }
 
@@ -257,16 +250,18 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
 
         }else{
             m_blockIp.insert(clientIp);
-            QJsonObject jObj;
-            jObj.insert("type", "connect_fail");
+            QJsonObject jObj({
+                             {"type", "connect_fail"}
+                             });
             send_to_client(clientSocket, jObj);
             clientSocket.abort();
             qDebug() << "User is not contained in list";
         }
     }else{
         // Отправка сообщения о том что сосать, а не подключение.
-        QJsonObject jObj;
-        jObj.insert("type", "connect_fail");
+        QJsonObject jObj({
+                         {"type", "connect_fail"}
+                         });
         send_to_client(clientSocket, jObj);
         clientSocket.disconnectFromHost();
         qDebug() << "User ip in banlist";
@@ -278,17 +273,19 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
 void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName){
     m_userList[newUsrName].socket = &sock; // FIXME здесь норм &??
 
-    QJsonObject jObj;
+    //QJsonObject jObj;
     QJsonArray resNum, resUser, resTime;
     for(quint8 i=0; i<m_resList.size(); i++){
         resNum.push_back(i);
         resUser.push_back(m_resList[i].currentUser);
         resTime.push_back(m_resList[i].time.toString("hh:mm:ss"));
     }
-    jObj.insert("type", "authorization");
-    jObj.insert("resnum", resNum);
-    jObj.insert("resuser", resUser);
-    jObj.insert("busyTime", resTime);
+    QJsonObject jObj({
+                     {"type", "authorization"},
+                     {"resnum", resNum},
+                     {"resuser", resUser},
+                     {"busyTime", resTime}
+                     });
     send_to_client(sock, jObj);
 }
 
@@ -301,11 +298,11 @@ void Server::res_req_take(const QJsonObject &jObj){
     QJsonArray resNum;      // индекс ресурса (все, не только запрашиваемые)
     QJsonArray resUser;     // текущий владелец ресурса
     QJsonArray resTime;     // время, которое текущий пользователь занимает ресурс
-    quint64 usrTime = static_cast<quint64>(jObj["time"].toInt());
-    qint64 reqRes = static_cast<qint64>(jObj["request"].toInt());
-    qint64 curRes = 0;
+    qint32 usrTime = static_cast<qint32>(jObj["time"].toInt());
+    qint32 reqRes = static_cast<qint32>(jObj["request"].toInt());
+    qint32 curRes = 0;
     QString usrName = jObj["username"].toString();
-    for(qint8 i=0; i<m_resList.size(); i++){
+    for(quint8 i=0; i<m_resList.size(); i++){
         curRes = (reqRes >> (i*8)) & 0xFF;
         if(curRes){
             qint64 diffTime = m_resList[i].time.secsTo(QTime::currentTime());
@@ -402,7 +399,7 @@ void Server::res_req_free(const QJsonObject &jObj){
 void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
     if(sock.state() == QAbstractSocket::ConnectedState){
         QJsonDocument jsonDoc(jObj);
-        sock.write(jsonDoc.toJson());
+        sock.write(jsonDoc.toJson(QJsonDocument::Compact));
     }else{
         qDebug() << "Socket not connected";
     }
@@ -411,30 +408,30 @@ void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
 
 // Обновление данных о ресурсах/пользователях у всех клиентов. Наверное так делать не совсем верно.
 void Server::send_to_all_clients(){
-    QJsonObject jObj;
     QJsonArray resNum, resUser, resTime;
     for(quint8 i=0; i<m_resList.size(); i++){
         resNum.push_back(QJsonValue(i));
         resUser.push_back(QJsonValue(m_resList.value(i).currentUser));
         resTime.push_back(QJsonValue(m_resList.value(i).time.toString("hh:mm:ss")));
     }
-    jObj.insert("type", "broadcast");
-    jObj.insert("resnum", resNum);
-    jObj.insert("resuser", resUser);
-    jObj.insert("busyTime", resTime);
-
+    QJsonObject jObj({
+                     {"type", "broadcast"},
+                     {"resnum", resNum},
+                     {"resuser", resUser},
+                     {"busyTime", resTime}
+                     });
     QJsonDocument jsonDoc(jObj);
     for(auto i = m_userList.begin(); i != m_userList.end(); ++i){
         if(i.value().socket && i.value().socket->state() == QTcpSocket::ConnectedState ){
-            i.value().socket->write(jsonDoc.toJson());
+            i.value().socket->write(jsonDoc.toJson(QJsonDocument::Compact));
         }
     }
 }
 
 
 bool Server::registr(const std::string &username, uint32_t resource_index){
-    Q_UNUSED(username);
-    Q_UNUSED(resource_index);
+    Q_UNUSED(username)
+    Q_UNUSED(resource_index)
     // потоко-небезопасная функция
     mutex.lock();
     // действия
