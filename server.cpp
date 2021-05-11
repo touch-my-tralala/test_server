@@ -32,12 +32,12 @@ Server::~Server(){
     for(auto i = m_resList.begin(); i != m_resList.end(); i++){
         saveList << QString::number(i.key());
     }
-    sett.setValue("RESOURCE_LIST", saveList);
+    sett->setValue("RESOURCE_LIST", saveList);
     saveList.clear();
     for(auto i =m_userList.begin(); i != m_userList.end(); i++){
         saveList << i.key();
     }
-    sett.setValue("USER_LIST", saveList);
+    sett->setValue("USER_LIST", saveList);
 
     if(m_server.isListening()){
         m_server.close();
@@ -95,7 +95,7 @@ void Server::allResClear(){
     QString usrName;
     for(quint8 i = 0; i < m_resList.size(); ++i){
         if(m_resList[i].currentUser != "Free"){
-            usrName = m_resList.value(i).currentUser;
+            usrName = m_resList[i].currentUser;
             // FIXME проверить будет ли работать.
             m_grabRes[usrName].push_back(i);
             m_resList[i].currentUser = "Free";
@@ -138,44 +138,45 @@ void Server::removeUsr(QString name){
 
 
 void Server::ini_parse(QString fname){
-    sett.setPath(QSettings::IniFormat, QSettings::UserScope,  QDir::currentPath() + "/" + fname); // FIXME хз на счет scope
-    if(sett.isWritable()){
-        sett.setIniCodec("UTF-8");
-        sett.beginGroup("SERVER_SETTINGS");
-        if(sett.contains("port")){
-            port = static_cast<quint16>(sett.value("port", 9292).toUInt());
+    sett = QSharedPointer<QSettings>(new QSettings(QDir::currentPath() + "/" + fname, QSettings::IniFormat)); // FIXME хз как не использовать указатель. не понял как сменить путь.
+    if(sett->isWritable()){
+        sett->setIniCodec("UTF-8");
+        sett->beginGroup("SERVER_SETTINGS");
+        if(sett->contains("port")){
+            port = static_cast<quint16>(sett->value("port", 9292).toUInt());
         }else{
             port = 9292;
-            sett.setValue("port", 9292);
+            sett->setValue("port", 9292);
         }
 
-        if(sett.contains("max_user")){
-            maxUsers = static_cast<quint8>(sett.value("max_user", 5).toUInt());
+        if(sett->contains("max_user")){
+            maxUsers = static_cast<quint8>(sett->value("max_user", 5).toUInt());
         }else{
             maxUsers = 5;
-            sett.setValue("max_user", 5);
+            sett->setValue("max_user", 5);
         }
-        sett.endGroup();
+        sett->endGroup();
 
         QStringList iniList;
         // Инициализация списка разрешенных пользователей
-        if(sett.contains("USER_LIST")){
-            sett.beginGroup("USER_LIST");
-             iniList = sett.childKeys();
-            for (QString &i : iniList){
-                auto name = sett.value(i, "no_data").toString().toLower();
+        if(sett->contains("USER_LIST")){
+            sett->beginGroup("USER_LIST");
+             iniList = sett->childKeys();
+            //for (QString &i : iniList){
+            for (auto i : iniList){
+                auto name = sett->value(i, "no_data").toString().toLower();
                 m_userList.insert(name, UserInf());
             }
-            sett.endGroup();
+            sett->endGroup();
         }
 
-        if(sett.contains("RESOURCE_LIST")){
-            sett.beginGroup("RESOURCE_LIST");
-            iniList = sett.childKeys();
+        if(sett->contains("RESOURCE_LIST")){
+            sett->beginGroup("RESOURCE_LIST");
+            iniList = sett->childKeys();
             for(quint8 i=0; i<iniList.size(); i++){
                 m_resList.insert(i, ResInf());
             }
-            sett.endGroup();
+            sett->endGroup();
         }
    }else{
         qDebug() << "ini is read-only";
