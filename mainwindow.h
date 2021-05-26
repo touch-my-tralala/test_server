@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QStandardItemModel>
 //#include <QtCore>
 #include <server.h>
 
@@ -31,12 +32,17 @@ private slots:
     void on_clearAllBtn_clicked();
     void on_timeoutBtn_clicked();
 
+    void on_tabWidget_tabBarClicked(int index);
+
+    void on_tabWidget_currentChanged(int index);
+
 private:
     qint32 busyTime;
     Ui::MainWindow *ui;
     QDateTime date_time;
     Server server;
     QTimer timer;
+    QStandardItemModel table_model;
     QMap<quint8, ResInf> res_inf;
 };
 #endif // MAINWINDOW_H

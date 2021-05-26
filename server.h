@@ -51,7 +51,8 @@ public:
     void setRejectConnection(bool a);
     void setRejectResReq(bool a);
     QList<quint8> getResList();
-    QString getResUser(quint8 resNum);
+    QStringList getUserList();
+    QString getResUser(quint8 resNum);    
     qint32 getBusyResTime(quint8 resNum);
     void allResClear();
     void addNewRes(quint8 resNum);

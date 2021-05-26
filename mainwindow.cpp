@@ -7,8 +7,12 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     QStringList headerLabel;
-    headerLabel << "Res num" << "Res user" << "Busy time";
+    headerLabel << "№" << "Пользователь" << "Время пользования";
     ui->tableWidget->setHorizontalHeaderLabels(headerLabel);
+
+    headerLabel.clear();
+    headerLabel << "№" << "Пользователь";
+    table_model.setHorizontalHeaderLabels(headerLabel);
 
     date_time =  QDateTime(QDateTime::currentDateTime());
     timer.setInterval(1000);
@@ -43,21 +47,25 @@ void MainWindow::on_rejectConnCheckBox_stateChanged(int arg1)
     server.setRejectConnection(arg1);
 }
 
+
 void MainWindow::on_rejectResCheckBox_stateChanged(int arg1)
 {
     server.setRejectResReq(arg1);
 }
+
 
 void MainWindow::on_clearAllBtn_clicked()
 {
     server.allResClear();
 }
 
+
 void MainWindow::on_timeoutBtn_clicked()
 {
     qint64 sec = QTime(0, 0, 0).secsTo(ui->timeEdit->time());
     server.setTimeOut(sec);
 }
+
 
 void MainWindow::time_out(){
     for(auto i = res_inf.begin(); i != res_inf.end(); i++){
@@ -66,4 +74,20 @@ void MainWindow::time_out(){
             busyTime = server.getBusyResTime(i.key());
             ui->tableWidget->item(i.key(), 2)->setData(Qt::DisplayRole, QTime(0, 0, 0).addSecs(busyTime).toString("hh:mm:ss"));
         }
+}
+
+
+void MainWindow::on_tabWidget_currentChanged(int index)
+{
+    if(index == 2){
+        QStringList usrList = server.getUserList();
+        QStandardItem item(1, 1);
+        for(auto i = 0; i < usrList.size(); i++){
+            item.setData(i);
+            table_model.setItem(i, 0, &item);
+            item.setData(usrList[i]);
+            table_model.setItem(i, 1, &item);
+        }
+        ui->tableView->setModel(&table_model);
+    }
 }

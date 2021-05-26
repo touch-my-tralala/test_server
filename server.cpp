@@ -71,6 +71,14 @@ QList<quint8> Server::getResList(){
     return resList;
 }
 
+QStringList Server::getUserList(){
+    QStringList usrList;
+    for(auto i = m_userList.begin(); i != m_userList.end(); i++){
+        usrList << i.key();
+    }
+    return usrList;
+}
+
 QString Server::getResUser(quint8 resNum){
     if(m_resList.contains(resNum))
         return m_resList[resNum].currentUser;
