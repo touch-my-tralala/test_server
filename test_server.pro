@@ -20,10 +20,12 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
     main.cpp \
     mainwindow.cpp \
+    mytableviewmodel.cpp \
     server.cpp
 
 HEADERS += \
     mainwindow.h \
+    mytableviewmodel.h \
     server.h
 
 FORMS += \

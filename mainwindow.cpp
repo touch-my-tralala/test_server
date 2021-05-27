@@ -10,10 +10,6 @@ MainWindow::MainWindow(QWidget *parent)
     headerLabel << "№" << "Пользователь" << "Время пользования";
     ui->tableWidget->setHorizontalHeaderLabels(headerLabel);
 
-    headerLabel.clear();
-    headerLabel << "№" << "Пользователь";
-    table_model.setHorizontalHeaderLabels(headerLabel);
-
     date_time =  QDateTime(QDateTime::currentDateTime());
     timer.setInterval(1000);
     connect(&timer, &QTimer::timeout, this, &MainWindow::time_out);
@@ -30,6 +26,12 @@ MainWindow::MainWindow(QWidget *parent)
         ui->tableWidget->setItem( i, 0, new QTableWidgetItem(QString::number(i)) );
         ui->tableWidget->setItem( i, 1, new QTableWidgetItem(res_inf[i].currentUser) );
         ui->tableWidget->setItem( i, 2, new QTableWidgetItem(res_inf[i].time.toString("hh:mm:ss")) );
+    }
+
+    QStringList usrList = server.getUserList();
+    ui->tableView->setModel(m_model = new MyTableViewModel);
+    for(auto i = 0; i < usrList.size(); i++){
+        m_model->appendUser(usrList[i]);
     }
 
     timer.start();
@@ -80,14 +82,18 @@ void MainWindow::time_out(){
 void MainWindow::on_tabWidget_currentChanged(int index)
 {
     if(index == 2){
-        QStringList usrList = server.getUserList();
-        QStandardItem item(1, 1);
-        for(auto i = 0; i < usrList.size(); i++){
-            item.setData(i);
-            table_model.setItem(i, 0, &item);
-            item.setData(usrList[i]);
-            table_model.setItem(i, 1, &item);
-        }
-        ui->tableView->setModel(&table_model);
     }
+}
+
+
+void MainWindow::on_addAuthorizedUsrBtn_clicked()
+{
+    m_model->appendUser( ui->addUsrText->toPlainText().toLower() );
+    ui->addUsrText->clear();
+}
+
+// крашится при удалении
+void MainWindow::on_deleteAuthorizedUsrBtn_clicked()
+{
+    m_model->removeSelected();
 }

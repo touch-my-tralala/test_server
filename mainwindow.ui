@@ -155,7 +155,23 @@
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_6">
               <item>
-               <widget class="QPushButton" name="pushButton_2">
+               <widget class="QTextEdit" name="addUsrText">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>150</width>
+                  <height>25</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="addAuthorizedUsrBtn">
                 <property name="text">
                  <string>Добавить</string>
                 </property>
@@ -175,7 +191,7 @@
                </spacer>
               </item>
               <item>
-               <widget class="QPushButton" name="pushButton_3">
+               <widget class="QPushButton" name="deleteAuthorizedUsrBtn">
                 <property name="text">
                  <string>Удалить</string>
                 </property>
