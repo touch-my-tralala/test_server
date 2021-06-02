@@ -75,24 +75,34 @@ void MainWindow::time_out(){
             ui->tableWidget->item(i.key(), 1)->setData(Qt::DisplayRole ,res_inf[i.key()].currentUser);
             busyTime = server.getBusyResTime(i.key());
             ui->tableWidget->item(i.key(), 2)->setData(Qt::DisplayRole, QTime(0, 0, 0).addSecs(busyTime).toString("hh:mm:ss"));
-        }
+    }
 }
 
 
 void MainWindow::on_tabWidget_currentChanged(int index)
 {
     if(index == 2){
+        QStringList usrList = server.getUserList();
+        for(auto j: usrList){
+            m_model->appendUser(j);
+        }
     }
 }
 
 
 void MainWindow::on_addAuthorizedUsrBtn_clicked()
-{
-    m_model->appendUser( ui->addUsrText->toPlainText().toLower() );
-    ui->addUsrText->clear();
+{   // FIXME курсор в рамке текста можно поставить в любом месте, а надо чтобы он двигался только по мере текста
+    qDebug() << ui->userNameLineEdit->text();
+    bool answ = m_model->appendUser( ui->userNameLineEdit->text());
+    if(answ){
+        server.addNewUsrName(ui->userNameLineEdit->text().toLower());
+        statusBar()->showMessage("User added successfully");
+    }else
+        statusBar()->showMessage("Username is already in the list");
+    ui->userNameLineEdit->clear();
 }
 
-// крашится при удалении
+// FIXME крашится при удалении
 void MainWindow::on_deleteAuthorizedUsrBtn_clicked()
 {
     m_model->removeSelected();

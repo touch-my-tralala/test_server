@@ -155,18 +155,18 @@
             <item>
              <layout class="QHBoxLayout" name="horizontalLayout_6">
               <item>
-               <widget class="QTextEdit" name="addUsrText">
-                <property name="sizePolicy">
-                 <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-                  <horstretch>0</horstretch>
-                  <verstretch>0</verstretch>
-                 </sizepolicy>
+               <widget class="QLineEdit" name="userNameLineEdit">
+                <property name="inputMask">
+                 <string>Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</string>
                 </property>
-                <property name="maximumSize">
-                 <size>
-                  <width>150</width>
-                  <height>25</height>
-                 </size>
+                <property name="maxLength">
+                 <number>40</number>
+                </property>
+                <property name="placeholderText">
+                 <string>user name</string>
+                </property>
+                <property name="cursorMoveStyle">
+                 <enum>Qt::VisualMoveStyle</enum>
                 </property>
                </widget>
               </item>

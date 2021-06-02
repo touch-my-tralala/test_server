@@ -301,7 +301,6 @@ void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName
 
 // Запрос ресурсов
 void Server::res_req_take(const QJsonObject &jObj){
-    QJsonObject servNotice; // Ответ сервера обратившемуся клиенту
     QJsonArray resNumReq;   // номер запрашиваемого ресурса
     QJsonArray resStatus;   // ответ на запрашиваемый ресурс
     QJsonArray resNum;      // индекс ресурса (все, не только запрашиваемые)
@@ -360,17 +359,18 @@ void Server::res_req_take(const QJsonObject &jObj){
     }
     m_grabRes.clear();
 
-    servNotice.insert("type", "request_responce");
-    servNotice.insert("action", "take");
-    servNotice.insert("resource_responce", resNumReq);
-    servNotice.insert("status", resStatus);
+    QJsonObject servNotice({
+                               {"type", "request_responce"},
+                               {"action", "take"},
+                               {"resource_responce", resNumReq},
+                               {"status", resStatus}
+                           });
     send_to_client(*m_userList[usrName].socket, servNotice);
 }
 
 
 // Освобождение ресурсов
 void Server::res_req_free(const QJsonObject &jObj){
-    QJsonObject servNotice; // Ответ сервера обратившемуся клиенту
     QJsonArray resNumReq;   // номер запрашиваемого ресурса
     QJsonArray resStatus;   // ответ на запрашиваемый ресурс
     QJsonArray resNum;      // индекс ресурса (все, не только запрашиваемые)
@@ -394,13 +394,16 @@ void Server::res_req_free(const QJsonObject &jObj){
         resUser.push_back(m_resList[i].currentUser);
         resTime.push_back(m_resList[i].time.toString("hh:mm:ss"));
     }
-    servNotice.insert("type", "request_responce");
-    servNotice.insert("action", "free");
-    servNotice.insert("resource_responce", resNumReq);
-    servNotice.insert("status", resStatus);
-    servNotice.insert("resnum", resNum);
-    servNotice.insert("resuser", resUser);
-    servNotice.insert("busyTime", resTime);
+
+    QJsonObject servNotice({
+                               {"type", "request_responce"},
+                               {"action", "free"},
+                               {"resource_responce", resNumReq},
+                               {"status", resStatus},
+                               {"resnum", resNum},
+                               {"resuser", resUser},
+                               {"busyTime", resTime}
+                           });
     send_to_client(*m_userList[usrName].socket, servNotice);
 }
 

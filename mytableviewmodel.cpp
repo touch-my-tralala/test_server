@@ -54,7 +54,11 @@ Qt::ItemFlags MyTableViewModel::flags(const QModelIndex &index) const{
 }
 
 
-void MyTableViewModel::appendUser(const QString &usrName){
+bool MyTableViewModel::appendUser(const QString &usrName){
+    for(auto i: m_users){
+        if(i[NAME] == usrName)
+            return false;
+    }
     UserData user;
     user[NAME] = usrName;
     user[SELECTED] = false;
@@ -62,6 +66,7 @@ void MyTableViewModel::appendUser(const QString &usrName){
     beginInsertRows( QModelIndex(), row, row);
     m_users.append(user);
     endInsertRows();
+    return true;
 }
 
 

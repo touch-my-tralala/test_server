@@ -15,7 +15,7 @@ public:
     QVariant headerData( int section, Qt::Orientation orientation, int role ) const;
     Qt::ItemFlags flags( const QModelIndex& index ) const;
 
-    void appendUser(const QString& usrName);
+    bool appendUser(const QString& usrName);
 
 public slots:
     void removeSelected();
