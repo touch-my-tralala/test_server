@@ -24,7 +24,7 @@ Server::Server()
     connect(&m_server, &QTcpServer::newConnection,
             this, &Server::on_slotNewConnection);
 
-    startServTime = QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss");
+    startServTime = QDateTime::currentDateTime();
 }
 
 Server::~Server(){
@@ -96,6 +96,10 @@ qint32 Server::getBusyResTime(quint8 resNum){
     }else{
         return -1;
     }
+}
+
+const QDateTime& Server::getStartTime() const{
+    return startServTime;
 }
 
 void Server::allResClear(){

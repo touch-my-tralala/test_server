@@ -2,6 +2,7 @@
 #define MYTABLEVIEWMODEL_H
 
 #include <QAbstractTableModel>
+#include <QDebug>
 
 class MyTableViewModel : public QAbstractTableModel
 {

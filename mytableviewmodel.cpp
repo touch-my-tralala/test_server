@@ -82,14 +82,16 @@ bool MyTableViewModel::setData(const QModelIndex &index, const QVariant &value, 
 
 void MyTableViewModel::removeSelected(){
     int k = 0;
-    for(auto i = m_users.begin(); i != m_users.end(); i++){
-        if( i->value( SELECTED, false).toBool() ){
+    for(auto i = m_users.begin(); i != m_users.end();){
+        if( i->value( SELECTED, false).toBool() ){ // FIXME тут сначал забирается текущее значение а затем сразу устанавливается новое?
             beginRemoveRows(QModelIndex(), k, k);
             i = m_users.erase(i);
             endRemoveRows();
         }else{
             ++k;
+            ++i;
         }
+        qDebug();
     }
 }
 

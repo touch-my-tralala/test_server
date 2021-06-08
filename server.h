@@ -54,6 +54,7 @@ public:
     QStringList getUserList();
     QString getResUser(quint8 resNum);    
     qint32 getBusyResTime(quint8 resNum);
+    const QDateTime& getStartTime() const;
     void allResClear();
     void addNewRes(quint8 resNum);
     void addNewUsrName(QString name);
@@ -92,7 +93,7 @@ private:
     QMap<quint8, ResInf>  m_resList; // имя ресурса - текущий пользователь
     QMap<QString, QJsonArray> m_grabRes; // имя пользователя - лист ресурсов, которые у него забрали
     QSet<QHostAddress>  m_blockIp;
-    QString startServTime;
+    QDateTime startServTime;
     QJsonDocument jDoc;
     QJsonParseError jsonErr;
     QByteArray buff;

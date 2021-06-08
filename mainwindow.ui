@@ -292,6 +292,13 @@
         </property>
        </spacer>
       </item>
+      <item>
+       <widget class="QLabel" name="workTime">
+        <property name="text">
+         <string>Время работы:</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </item>
    </layout>

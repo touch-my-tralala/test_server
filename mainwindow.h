@@ -44,6 +44,7 @@ private:
     QDateTime date_time;
     Server server;
     QTimer timer;
+    QDateTime work_time;
     MyTableViewModel* m_model;
     QMap<quint8, ResInf> res_inf;
 

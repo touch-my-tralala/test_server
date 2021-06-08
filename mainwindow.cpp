@@ -7,7 +7,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     QStringList headerLabel;
-    headerLabel << "№" << "Пользователь" << "Время пользования";
+    headerLabel << "Ресурс" << "Пользователь" << "Время использования";
     ui->tableWidget->setHorizontalHeaderLabels(headerLabel);
 
     date_time =  QDateTime(QDateTime::currentDateTime());
@@ -24,15 +24,24 @@ MainWindow::MainWindow(QWidget *parent)
 
     for(auto i = 0; i < res_inf.size(); i++){
         ui->tableWidget->setItem( i, 0, new QTableWidgetItem(QString::number(i)) );
+        ui->tableWidget->item(i, 0)->setTextAlignment(Qt::AlignCenter);
         ui->tableWidget->setItem( i, 1, new QTableWidgetItem(res_inf[i].currentUser) );
+        ui->tableWidget->item(i, 1)->setTextAlignment(Qt::AlignCenter);
         ui->tableWidget->setItem( i, 2, new QTableWidgetItem(res_inf[i].time.toString("hh:mm:ss")) );
+        ui->tableWidget->item(i, 2)->setTextAlignment(Qt::AlignCenter);
     }
+    ui->tableWidget->resizeColumnsToContents();
 
     QStringList usrList = server.getUserList();
     ui->tableView->setModel(m_model = new MyTableViewModel);
     for(auto i = 0; i < usrList.size(); i++){
         m_model->appendUser(usrList[i]);
     }
+
+    work_time = server.getStartTime();
+    qint64 days = work_time.daysTo(QDateTime::currentDateTime());
+    qint64 secs = work_time.time().secsTo(QTime::currentTime());
+    ui->workTime->setText( "Время работы " + QString::number(days) + " дней " + QTime(0,0,0).addSecs(secs).toString("hh:mm:ss") );
 
     timer.start();
 }
@@ -73,9 +82,17 @@ void MainWindow::time_out(){
     for(auto i = res_inf.begin(); i != res_inf.end(); i++){
             res_inf[i.key()].currentUser = server.getResUser(i.key());
             ui->tableWidget->item(i.key(), 1)->setData(Qt::DisplayRole ,res_inf[i.key()].currentUser);
+            ui->tableWidget->item(i.key(), 1)->setTextAlignment(Qt::AlignCenter);
             busyTime = server.getBusyResTime(i.key());
             ui->tableWidget->item(i.key(), 2)->setData(Qt::DisplayRole, QTime(0, 0, 0).addSecs(busyTime).toString("hh:mm:ss"));
+            ui->tableWidget->item(i.key(), 2)->setTextAlignment(Qt::AlignCenter);
     }
+    ui->tableWidget->resizeColumnsToContents();
+
+
+    qint64 days = work_time.daysTo(QDateTime::currentDateTime());
+    qint64 secs = work_time.time().secsTo(QTime::currentTime());
+    ui->workTime->setText( "Время работы " + QString::number(days) + " дней " + QTime(0,0,0).addSecs(secs).toString("hh:mm:ss") );
 }
 
 
@@ -102,7 +119,7 @@ void MainWindow::on_addAuthorizedUsrBtn_clicked()
     ui->userNameLineEdit->clear();
 }
 
-// FIXME крашится при удалении
+
 void MainWindow::on_deleteAuthorizedUsrBtn_clicked()
 {
     m_model->removeSelected();
