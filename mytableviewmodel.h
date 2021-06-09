@@ -19,7 +19,7 @@ public:
     bool appendUser(const QString& usrName);
 
 public slots:
-    void removeSelected();
+    QStringList removeSelected();
 
 private:
     enum Column{

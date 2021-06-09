@@ -6,6 +6,7 @@
 //#include <QtCore>
 #include <server.h>
 #include <mytableviewmodel.h>
+#include <logger/loggerwidget.h>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -41,6 +42,7 @@ private slots:
 private:
     qint32 busyTime;
     Ui::MainWindow *ui;
+    LoggerWidget *logger_w;
     QDateTime date_time;
     Server server;
     QTimer timer;

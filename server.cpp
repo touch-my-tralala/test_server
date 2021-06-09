@@ -173,8 +173,7 @@ void Server::ini_parse(QString fname){
         // Инициализация списка разрешенных пользователей
         if(sett->contains("USER_LIST")){
             sett->beginGroup("USER_LIST");
-             iniList = sett->childKeys();
-            //for (QString &i : iniList){
+            iniList = sett->childKeys();
             for (auto i : iniList){
                 auto name = sett->value(i, "no_data").toString().toLower();
                 m_userList.insert(name, UserInf());

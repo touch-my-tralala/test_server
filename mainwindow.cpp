@@ -6,6 +6,11 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+    logger_w = new LoggerWidget(this);
+    ui->loggerLayout->addWidget(logger_w);
+
+
     QStringList headerLabel;
     headerLabel << "Ресурс" << "Пользователь" << "Время использования";
     ui->tableWidget->setHorizontalHeaderLabels(headerLabel);
@@ -55,18 +60,27 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_rejectConnCheckBox_stateChanged(int arg1)
 {
+    if(arg1)
+        logger_w->output("Входящие подключения отклоняются.");
+    else
+        logger_w->output("Входящие подключения принимаются.");
     server.setRejectConnection(arg1);
 }
 
 
 void MainWindow::on_rejectResCheckBox_stateChanged(int arg1)
 {
+    if(arg1)
+        logger_w->output("Запросы ресурсов отклоняются.");
+    else
+        logger_w->output("Запросы ресурсов принимаются.");
     server.setRejectResReq(arg1);
 }
 
 
 void MainWindow::on_clearAllBtn_clicked()
 {
+    logger_w->output("Освобождение всех ресурсов.");
     server.allResClear();
 }
 
@@ -74,6 +88,7 @@ void MainWindow::on_clearAllBtn_clicked()
 void MainWindow::on_timeoutBtn_clicked()
 {
     qint64 sec = QTime(0, 0, 0).secsTo(ui->timeEdit->time());
+    logger_w->output("Установлен тайм-аут использования ресурсов: " + QTime(0,0,0).addSecs(sec).toString("hh:mm:ss."));
     server.setTimeOut(sec);
 }
 
@@ -109,18 +124,27 @@ void MainWindow::on_tabWidget_currentChanged(int index)
 
 void MainWindow::on_addAuthorizedUsrBtn_clicked()
 {   // FIXME курсор в рамке текста можно поставить в любом месте, а надо чтобы он двигался только по мере текста
-    qDebug() << ui->userNameLineEdit->text();
-    bool answ = m_model->appendUser( ui->userNameLineEdit->text());
+    QString text = ui->userNameLineEdit->text();
+    bool answ = m_model->appendUser(text);
     if(answ){
         server.addNewUsrName(ui->userNameLineEdit->text().toLower());
-        statusBar()->showMessage("User added successfully");
-    }else
-        statusBar()->showMessage("Username is already in the list");
+        logger_w->output("Пользователь " + text + " успешно добавлен.");
+        //statusBar()->showMessage("User added successfully");
+    }else{
+        //statusBar()->showMessage("Username is already in the list");
+        logger_w->output("Имя " + text + " уже есть в списке.");
+    }
     ui->userNameLineEdit->clear();
 }
 
 
 void MainWindow::on_deleteAuthorizedUsrBtn_clicked()
 {
-    m_model->removeSelected();
+    QStringList rmvUsers;
+
+    rmvUsers = m_model->removeSelected();
+    for(auto i: rmvUsers){
+        server.removeUsr(i);
+        logger_w->output("Удален пользователь " + i);
+    }
 }
