@@ -10,21 +10,22 @@
 Server::Server()
 {
     Server::ini_parse("init.ini");
-    qDebug() << "port = " << port;
-    qDebug() << "max_user = " << maxUsers;
+
+    emit signalLogEvent("Server → Максимальное количество пользователей - " + QString::number(maxUsers) + ".");
 
     m_server.setMaxPendingConnections(maxUsers);
 
     if(!m_server.listen(QHostAddress::Any, port)){
-        qDebug() << "Error listening";
+        emit signalLogEvent("ОШИБКА → Прослушивание порта невозможно.");
         return;
     }else{
-        qDebug() << "Server listening port " << port;
+        emit signalLogEvent("Server → порт - " + QString::number(port) + ".");
     }
     connect(&m_server, &QTcpServer::newConnection,
             this, &Server::on_slotNewConnection);
 
     startServTime = QDateTime::currentDateTime();
+    emit signalLogEvent("Server → Время старта: " + startServTime.toString("hh:mm:ss."));
 }
 
 Server::~Server(){
@@ -46,21 +47,30 @@ Server::~Server(){
 
 void Server::setTimeOut(qint64 secs){
     maxBusyTime = secs;
+    emit signalLogEvent("Server → Тайм-аут " + QTime(0,0,0).addSecs(secs).toString() + " успешно установлен.");
 }
 
 void Server::setMaxUser(quint8 maxUsers){
     this->maxUsers = maxUsers;
+    emit signalLogEvent("Server → Макс. количество пользователей "
+                        + QString::number(maxUsers) + " успешно установлено.");
 }
 
 void Server::setRejectConnection(bool a){
-    if(a)
+    if(a){
         m_server.pauseAccepting();
-    else
+        emit signalLogEvent("Server → Входящие подключения отклоняются.");
+    }else{
         m_server.resumeAccepting();
+        emit signalLogEvent("Server → Входящие подключения принимаются.");
+    }
 }
 
 void Server::setRejectResReq(bool a){
     reject_res_req = a;
+    QString s = a ? "Server → Запросы ресурсов отклояются." :
+                    "Server → Запросы ресурсов принимаются.";
+    emit signalLogEvent(s);
 }
 
 QList<quint8> Server::getResList(){
@@ -82,8 +92,10 @@ QStringList Server::getUserList(){
 QString Server::getResUser(quint8 resNum){
     if(m_resList.contains(resNum))
         return m_resList[resNum].currentUser;
-    else
-        return "not contain a key";
+    else{
+        emit signalLogEvent("ОШИБКА → Пользователя с таким именем нет в списке getResUSer().");
+        return "";
+    }
 }
 
 // возвращает время в секундах прошедшее с момента занятия ресурса
@@ -94,6 +106,7 @@ qint32 Server::getBusyResTime(quint8 resNum){
         else
             return m_resList[resNum].time.secsTo(QTime::currentTime());
     }else{
+        emit signalLogEvent("ОШИБКА → Ресурса с таким именем нет в списке getBusyResTime().");
         return -1;
     }
 }
@@ -122,29 +135,42 @@ void Server::allResClear(){
         send_to_client(*m_userList[i.key()].socket, oldUserObj);
     }
     m_grabRes.clear();
+    emit signalLogEvent("Server → Очистка всех ресурсов.");
 }
 
 void Server::addNewRes(quint8 resNum){
     if(!m_resList.contains(resNum)){
         m_resList.insert(resNum, ResInf());
+        emit signalLogEvent("Server → Ресурс " + QString::number(resNum) + " успешно добавлен.");
+    }else{
+        emit signalLogEvent("ОШИБКА → Ресурс " + QString::number(resNum) + "уже есть в списке.");
     }
 }
 
 void Server::addNewUsrName(QString name){
     if(!m_userList.contains(name)){
         m_userList.insert(name, UserInf());
+        emit signalLogEvent("Server → Пользователь " + name + " успешно добавлен.");
+    }else{
+        emit signalLogEvent("ОШИБКА → Пользователь " + name + " уже есть в списке.");
     }
 }
 
 void Server::removeRes(quint8 resNum){
     if(m_resList.contains(resNum)){
         m_resList.remove(resNum);
+        emit signalLogEvent("Server → Ресурс " + QString::number(resNum) + " успешно удален.");
+    }else{
+        emit signalLogEvent("ОШИБКА → Ресурса "+ QString::number(resNum) + " нет в списке удален.");
     }
 }
 
 void Server::removeUsr(QString name){
     if(m_userList.contains(name)){
         m_userList.remove(name);
+        emit signalLogEvent("Server → Пользователь " + name + " успешно удален.");
+    }else{
+        emit signalLogEvent("ОШИБКА → Пользователя " + name + " нет в списке.");
     }
 }
 
@@ -190,14 +216,16 @@ void Server::ini_parse(QString fname){
             sett->endGroup();
         }
    }else{
-        qDebug() << "ini is read-only";
+        emit signalLogEvent("ОШИБКА → ini файл в режиме read-only.");
     }
 }
 
 
 void Server::on_slotNewConnection(){
     QTcpSocket* clientSocket = m_server.nextPendingConnection(); // FIXME эту хрень так оставить или надо удалять?
-    qDebug() << "New connection";
+
+    emit signalLogEvent("Server → Новое подключение: Addres - " + clientSocket->peerAddress().toString() +
+                        " Port - " + QString::number(clientSocket->peerPort()));
     connect(clientSocket, &QTcpSocket::disconnected,
             this, &Server::on_slotDisconnected);
     connect(clientSocket, &QTcpSocket::readyRead,
@@ -217,7 +245,7 @@ void Server::on_slotReadClient(){
     }
 
     if(buff.size() > 1048576){
-        qDebug() << "Buffer size > 1 Mb";
+        emit signalLogEvent("ОШИБКА → Буфер превышает 1 Мб.");
         buff.clear();
         return;
     }
@@ -228,14 +256,15 @@ void Server::on_slotReadClient(){
         json_handler(jDoc.object(), address, *clientSocket);
         buff.clear();
     }else{
-        qDebug() << jsonErr.errorString();
+        emit signalLogEvent("ОШИБКА → Ошибка json-формата " + jsonErr.errorString() + ".");
     }
 }
 
 
 void Server::on_slotDisconnected(){
     QTcpSocket* clientSocket = qobject_cast<QTcpSocket*>(sender());
-    qDebug() << clientSocket << " disconnected";
+    emit signalLogEvent("Server → Клиент: Addres - " + clientSocket->peerAddress().toString() +
+                        " Port - " + QString::number(clientSocket->peerPort()) + " отключился.");
     // FIXME возможно надо проверять теперь на валидность / подключенность сокета
     clientSocket->abort();
     clientSocket->deleteLater();
@@ -255,7 +284,7 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
                 else if(jObj["action"].toString() == "free")
                     res_req_free(jObj);
                 else
-                    qDebug() << "res_request not contain action: " + jObj["action"].toString();
+                    emit signalLogEvent("ОШИБКА → res_request не содержит действия " + jObj["action"].toString());
             }
             // отправка всем пользователям актуальной инфы
             send_to_all_clients();
@@ -267,7 +296,7 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
                              });
             send_to_client(clientSocket, jObj);
             clientSocket.abort();
-            qDebug() << "User is not contained in list";
+            emit signalLogEvent("Server → Имя пользователя " + jObj["username"].toString() + " не является разрешенным");
         }
     }else{
         // Отправка сообщения о том что сосать, а не подключение.
@@ -276,7 +305,7 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
                          });
         send_to_client(clientSocket, jObj);
         clientSocket.disconnectFromHost();
-        qDebug() << "User ip in banlist";
+        emit signalLogEvent("Server → IP клиента " + clientIp.toString() + " находися в бан листе до конца сессиий сервера.");
     }
 }
 
@@ -416,7 +445,7 @@ void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
         QJsonDocument jsonDoc(jObj);
         sock.write(jsonDoc.toJson(QJsonDocument::Compact));
     }else{
-        qDebug() << "Socket not connected";
+        emit signalLogEvent("ОШИБКА → Сокет c IP -" + sock.peerAddress().toString() + " не подключен.");
     }
 }
 

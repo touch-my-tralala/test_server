@@ -53,6 +53,6 @@ void LoggerWidget::output(QString s){
             font_color =  "<font color=#d00c0c>"; //red
 //        else
 //            font_color =  "<font color=#7a7a7a>"; //grey
-        appendHtml(font_color + QTime::currentTime().toString("HH:mm:ss.zzz ") +":  " + s + font_end);
+        appendHtml(font_color + QTime::currentTime().toString("HH:mm:ss.  ") + s + font_end);
 }
 

@@ -6,6 +6,8 @@
 //#include <QtCore>
 #include <server.h>
 #include <mytableviewmodel.h>
+#include <table_model/resurstableviewmodel.h>
+#include <table_model/usertableviewmodel.h>
 #include <logger/loggerwidget.h>
 
 QT_BEGIN_NAMESPACE
@@ -47,7 +49,9 @@ private:
     Server server;
     QTimer timer;
     QDateTime work_time;
-    MyTableViewModel* m_model;
+    //MyTableViewModel* m_model;
+    UserTableViewModel* m_usr_model;
+    ResursTableViewModel* m_res_model;
     QMap<quint8, ResInf> res_inf;
 
 };

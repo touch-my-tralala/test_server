@@ -22,13 +22,17 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     mytableviewmodel.cpp \
-    server.cpp
+    server.cpp \
+    table_model/resurstableviewmodel.cpp \
+    table_model/usertableviewmodel.cpp
 
 HEADERS += \
     logger/loggerwidget.h \
     mainwindow.h \
     mytableviewmodel.h \
-    server.h
+    server.h \
+    table_model/resurstableviewmodel.h \
+    table_model/usertableviewmodel.h
 
 FORMS += \
     mainwindow.ui

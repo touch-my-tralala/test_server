@@ -61,6 +61,9 @@ public:
     void removeRes(quint8 resNum);
     void removeUsr(QString name);
 
+signals:
+    void signalLogEvent(QString s);
+
 private slots:
     void on_slotNewConnection();
     void on_slotReadClient();
@@ -77,7 +80,6 @@ private:
     void new_client_autorization(QTcpSocket &sock, const QString &newUsrName);
 
 private:
-    // params
     qint64 maxBusyTime = 7200; // 2 часа
     const qint64 numReadByte = 32;
     quint32 m_nextBlock = 0;
