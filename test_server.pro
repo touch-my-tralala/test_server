@@ -21,7 +21,6 @@ SOURCES += \
     logger/loggerwidget.cpp \
     main.cpp \
     mainwindow.cpp \
-    mytableviewmodel.cpp \
     server.cpp \
     table_model/resurstableviewmodel.cpp \
     table_model/usertableviewmodel.cpp
@@ -29,7 +28,6 @@ SOURCES += \
 HEADERS += \
     logger/loggerwidget.h \
     mainwindow.h \
-    mytableviewmodel.h \
     server.h \
     table_model/resurstableviewmodel.h \
     table_model/usertableviewmodel.h

@@ -34,6 +34,8 @@ QVariant UserTableViewModel::headerData(int section, Qt::Orientation orientation
 
 
 QVariant UserTableViewModel::data(const QModelIndex &index, int role) const{
+    if( !index.isValid() || m_users.count() <= index.row() || role == Qt::TextAlignmentRole )
+        return Qt::AlignCenter;
     if(!index.isValid() ||
        m_users.count() <= index.row() ||
        ( role != Qt::DisplayRole && role != Qt::EditRole )

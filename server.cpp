@@ -1,7 +1,6 @@
 #include "server.h"
 
 /* Что осталось доделать:
- * 1) лог
  * 2) время последней транзакции от клиента
  * 3) вместо строчных литералов сделать структуру ключей
  * 4) заполнение ini файла не верно работает.
@@ -30,9 +29,9 @@ Server::Server()
 
 Server::~Server(){
     QStringList saveList;
-    for(auto i = m_resList.begin(); i != m_resList.end(); i++){
+    /*for(auto i = m_resList.begin(); i != m_resList.end(); i++){
         saveList << QString::number(i.key());
-    }
+    }*/
     sett->setValue("RESOURCE_LIST", saveList);
     saveList.clear();
     for(auto i =m_userList.begin(); i != m_userList.end(); i++){
@@ -73,11 +72,10 @@ void Server::setRejectResReq(bool a){
     emit signalLogEvent(s);
 }
 
-QList<quint8> Server::getResList(){
-    QList<quint8> resList;
-    for(auto i = 0; i < m_resList.size(); i++){
-        resList << static_cast<quint8>(i);
-    }
+QStringList Server::getResList(){
+    QStringList resList;
+    for(auto i = m_resList.begin(); i != m_resList.end(); i++)
+        resList << i.key();
     return resList;
 }
 
@@ -89,9 +87,9 @@ QStringList Server::getUserList(){
     return usrList;
 }
 
-QString Server::getResUser(quint8 resNum){
-    if(m_resList.contains(resNum))
-        return m_resList[resNum].currentUser;
+QString Server::getResUser(QString resName){
+    if(m_resList.contains(resName))
+        return m_resList[resName].currentUser;
     else{
         emit signalLogEvent("ОШИБКА → Пользователя с таким именем нет в списке getResUSer().");
         return "";
@@ -99,12 +97,12 @@ QString Server::getResUser(quint8 resNum){
 }
 
 // возвращает время в секундах прошедшее с момента занятия ресурса
-qint32 Server::getBusyResTime(quint8 resNum){
-    if(m_resList.contains(resNum)){
-        if(m_resList[resNum].currentUser == "Free")
+qint32 Server::getBusyResTime(QString resName){
+    if(m_resList.contains(resName)){
+        if(m_resList[resName].currentUser == "Free")
             return 0;
         else
-            return m_resList[resNum].time.secsTo(QTime::currentTime());
+            return m_resList[resName].time.secsTo(QTime::currentTime());
     }else{
         emit signalLogEvent("ОШИБКА → Ресурса с таким именем нет в списке getBusyResTime().");
         return -1;
@@ -118,13 +116,13 @@ const QDateTime& Server::getStartTime() const{
 void Server::allResClear(){
     QJsonObject jObj;
     QString usrName;
-    for(quint8 i = 0; i < m_resList.size(); ++i){
-        if(m_resList[i].currentUser != "Free"){
-            usrName = m_resList[i].currentUser;
+    for(auto i = m_resList.begin(); i != m_resList.end(); i++){
+        if(i.value().currentUser != "Free"){
+            usrName = i.value().currentUser;
             // FIXME проверить будет ли работать.
-            m_grabRes[usrName].push_back(i);
-            m_resList[i].currentUser = "Free";
-            m_resList[i].time.setHMS(0, 0, 0);
+            m_grabRes[usrName].push_back(i.key());
+            i.value().currentUser = "Free";
+            i.value().time.setHMS(0, 0, 0);
         }
     }
     QJsonObject oldUserObj({
@@ -138,12 +136,12 @@ void Server::allResClear(){
     emit signalLogEvent("Server → Очистка всех ресурсов.");
 }
 
-void Server::addNewRes(quint8 resNum){
-    if(!m_resList.contains(resNum)){
-        m_resList.insert(resNum, ResInf());
-        emit signalLogEvent("Server → Ресурс " + QString::number(resNum) + " успешно добавлен.");
+void Server::addNewRes(QString resName){
+    if(!m_resList.contains(resName)){
+        m_resList.insert(resName, ResInf());
+        emit signalLogEvent("Server → Ресурс " + resName + " успешно добавлен.");
     }else{
-        emit signalLogEvent("ОШИБКА → Ресурс " + QString::number(resNum) + "уже есть в списке.");
+        emit signalLogEvent("ОШИБКА → Ресурс " + resName + "уже есть в списке.");
     }
 }
 
@@ -156,12 +154,12 @@ void Server::addNewUsrName(QString name){
     }
 }
 
-void Server::removeRes(quint8 resNum){
-    if(m_resList.contains(resNum)){
-        m_resList.remove(resNum);
-        emit signalLogEvent("Server → Ресурс " + QString::number(resNum) + " успешно удален.");
+void Server::removeRes(QString resName){
+    if(m_resList.contains(resName)){
+        m_resList.remove(resName);
+        emit signalLogEvent("Server → Ресурс " + resName + " успешно удален.");
     }else{
-        emit signalLogEvent("ОШИБКА → Ресурса "+ QString::number(resNum) + " нет в списке удален.");
+        emit signalLogEvent("ОШИБКА → Ресурса "+ resName + " нет в списке удален.");
     }
 }
 
@@ -210,8 +208,9 @@ void Server::ini_parse(QString fname){
         if(sett->contains("RESOURCE_LIST")){
             sett->beginGroup("RESOURCE_LIST");
             iniList = sett->childKeys();
-            for(quint8 i=0; i<iniList.size(); i++){
-                m_resList.insert(i, ResInf());
+            for(auto i: iniList){
+                auto name = sett->value(i, "no_data").toString().toLower();
+                m_resList.insert(name, ResInf());
             }
             sett->endGroup();
         }
@@ -316,10 +315,10 @@ void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName
 
     //QJsonObject jObj;
     QJsonArray resNum, resUser, resTime;
-    for(quint8 i=0; i<m_resList.size(); i++){
-        resNum.push_back(i);
-        resUser.push_back(m_resList[i].currentUser);
-        resTime.push_back(m_resList[i].time.toString("hh:mm:ss"));
+    for(auto i = m_resList.begin(); i != m_resList.end(); i++){
+        resNum.push_back(i.key());
+        resUser.push_back(i.value().currentUser);
+        resTime.push_back(i.value().time.toString("hh:mm:ss"));
     }
     QJsonObject jObj({
                      {"type", "authorization"},
@@ -335,51 +334,53 @@ void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName
 void Server::res_req_take(const QJsonObject &jObj){
     QJsonArray resNumReq;   // номер запрашиваемого ресурса
     QJsonArray resStatus;   // ответ на запрашиваемый ресурс
-    QJsonArray resNum;      // индекс ресурса (все, не только запрашиваемые)
+    QJsonArray resList;      // индекс ресурса (все, не только запрашиваемые)
     QJsonArray resUser;     // текущий владелец ресурса
     QJsonArray resTime;     // время, которое текущий пользователь занимает ресурс
     qint32 usrTime = static_cast<qint32>(jObj["time"].toInt());
     qint32 reqRes = static_cast<qint32>(jObj["request"].toInt());
     qint32 curRes = 0;
     QString usrName = jObj["username"].toString();
-    for(quint8 i=0; i<m_resList.size(); i++){
-        curRes = (reqRes >> (i*8)) & 0xFF;
+    quint8 idx = 0;
+    for(auto i = m_resList.begin(); i != m_resList.end(); i++){
+        curRes = (reqRes >> (idx*8)) & 0xFF;
+        idx++;
         if(curRes){
-            qint64 diffTime = m_resList[i].time.secsTo(QTime::currentTime());
+            qint64 diffTime = i.value().time.secsTo(QTime::currentTime());
             // Если ресурс свободен
-            if(m_resList.value(i).currentUser == "Free" && !reject_res_req){
-                m_resList[i].currentUser = usrName;
-                m_resList[i].time = QTime(0, 0, 0).addSecs(usrTime);
-                resNumReq.push_back(i);
+            if(i.value().currentUser == "Free" && !reject_res_req){
+                i.value().currentUser = usrName;
+                i.value().time = QTime(0, 0, 0).addSecs(usrTime);
+                resNumReq.push_back(i.key());
                 resStatus.push_back(1);
                 // вызов потоко-небезопасной функции
-                registr(usrName.toUtf8().constData(), i);
+                registr(usrName.toUtf8().constData(), idx);
             // ресурс занят, но по таймауту можно перехватить
             }else if(diffTime > maxBusyTime && !reject_res_req){
-                QString old_user = m_resList.value(i).currentUser;
-                m_resList[i].currentUser = usrName;
-                m_resList[i].time = QTime(0, 0, 0).addSecs(usrTime);
-                resNumReq.push_back(i);
+                QString old_user = i.value().currentUser;
+                i.value().currentUser = usrName;
+                i.value().time = QTime(0, 0, 0).addSecs(usrTime);
+                resNumReq.push_back(i.key());
                 resStatus.push_back(1);
                 // вызов потоко-небезопасной функции
-                registr(usrName.toUtf8().constData(), i);
+                registr(usrName.toUtf8().constData(), idx);
 
                 // Составление списка пользователей у которых забрали ресурсы.
                 if(m_grabRes.contains(old_user)){
-                    m_grabRes[old_user].push_back(i);
+                    m_grabRes[old_user].push_back(i.key());
                 }else{
                     m_grabRes.insert(old_user, QJsonArray());
-                    m_grabRes[old_user].push_back(i);
+                    m_grabRes[old_user].push_back(i.key());
                 }
             // ресурс занят
             }else{
-                resNumReq.push_back(i);
+                resNumReq.push_back(i.key());
                 resStatus.push_back(0);
             }
         }
-        resNum.push_back(i);
-        resUser.push_back(m_resList[i].currentUser);
-        resTime.push_back(m_resList[i].time.toString("hh:mm:ss"));
+        resList.push_back(i.key());
+        resUser.push_back(i.value().currentUser);
+        resTime.push_back(i.value().time.toString("hh:mm:ss"));
     }
 
     // Отправка всем пользователям у которых забрали ресурс список какие ресурсы у них забрали.
@@ -405,26 +406,28 @@ void Server::res_req_take(const QJsonObject &jObj){
 void Server::res_req_free(const QJsonObject &jObj){
     QJsonArray resNumReq;   // номер запрашиваемого ресурса
     QJsonArray resStatus;   // ответ на запрашиваемый ресурс
-    QJsonArray resNum;      // индекс ресурса (все, не только запрашиваемые)
+    QJsonArray resList;      // индекс ресурса (все, не только запрашиваемые)
     QJsonArray resUser;     // текущий владелец ресурса
     QJsonArray resTime;     // время, которое текущий пользователь занимает ресурс
     qint64 reqRes = static_cast<qint64>(jObj["request"].toInt());
     qint64 curRes = 0;
     QString usrName = jObj["username"].toString();
-    for(quint8 i=0; i<m_resList.size(); i++){
-        curRes = (reqRes >> (i*8)) & 0xFF;
-        if(curRes && m_resList[i].currentUser == usrName){
-            m_resList[i].currentUser = "Free";
-            m_resList[i].time.setHMS(0, 0, 0);
-            resNumReq.push_back(i);
+    quint8 idx=0;
+    for(auto i = m_resList.begin(); i != m_resList.end(); i++){
+        curRes = (reqRes >> (idx*8)) & 0xFF;
+        idx++;
+        if(curRes && i.value().currentUser == usrName){
+            i.value().currentUser = "Free";
+            i.value().time.setHMS(0, 0, 0);
+            resNumReq.push_back(i.key());
             resStatus.push_back(1);
         }else if(curRes){
-            resNumReq.push_back(i);
+            resNumReq.push_back(i.key());
             resStatus.push_back(0);
         }
-        resNum.push_back(i);
-        resUser.push_back(m_resList[i].currentUser);
-        resTime.push_back(m_resList[i].time.toString("hh:mm:ss"));
+        resList.push_back(i.key());
+        resUser.push_back(i.value().currentUser);
+        resTime.push_back(i.value().time.toString("hh:mm:ss"));
     }
 
     QJsonObject servNotice({
@@ -432,7 +435,7 @@ void Server::res_req_free(const QJsonObject &jObj){
                                {"action", "free"},
                                {"resource_responce", resNumReq},
                                {"status", resStatus},
-                               {"resnum", resNum},
+                               {"resnum", resList},
                                {"resuser", resUser},
                                {"busyTime", resTime}
                            });
@@ -452,15 +455,15 @@ void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
 
 // Обновление данных о ресурсах/пользователях у всех клиентов. Наверное так делать не совсем верно.
 void Server::send_to_all_clients(){
-    QJsonArray resNum, resUser, resTime;
-    for(quint8 i=0; i<m_resList.size(); i++){
-        resNum.push_back(QJsonValue(i));
-        resUser.push_back(QJsonValue(m_resList.value(i).currentUser));
-        resTime.push_back(QJsonValue(m_resList.value(i).time.toString("hh:mm:ss")));
+    QJsonArray resList, resUser, resTime;
+    for(auto i = m_resList.begin(); i != m_resList.end(); i++){
+        resList.push_back(i.key());
+        resUser.push_back(i.value().currentUser);
+        resTime.push_back(i.value().time.toString("hh:mm:ss"));
     }
     QJsonObject jObj({
                      {"type", "broadcast"},
-                     {"resnum", resNum},
+                     {"resnum", resList},
                      {"resuser", resUser},
                      {"busyTime", resTime}
                      });

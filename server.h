@@ -50,15 +50,15 @@ public:
     void setMaxUser(quint8 maxUser);
     void setRejectConnection(bool a);
     void setRejectResReq(bool a);
-    QList<quint8> getResList();
+    QStringList getResList();
     QStringList getUserList();
-    QString getResUser(quint8 resNum);    
-    qint32 getBusyResTime(quint8 resNum);
+    QString getResUser(QString resName);
+    qint32 getBusyResTime(QString resName);
     const QDateTime& getStartTime() const;
     void allResClear();
-    void addNewRes(quint8 resNum);
+    void addNewRes(QString resName);
     void addNewUsrName(QString name);
-    void removeRes(quint8 resNum);
+    void removeRes(QString resName);
     void removeUsr(QString name);
 
 signals:
@@ -91,8 +91,8 @@ private:
     QTcpServer m_server;
 
     QSharedPointer<QSettings> sett;
-    QMap<QString, UserInf>  m_userList; // FIXME можно без qsharedpointer
-    QMap<quint8, ResInf>  m_resList; // имя ресурса - текущий пользователь
+    QMap<QString, UserInf>  m_userList;  // FIXME можно без qsharedpointer
+    QMap<QString, ResInf>  m_resList;    // имя ресурса - текущий пользователь
     QMap<QString, QJsonArray> m_grabRes; // имя пользователя - лист ресурсов, которые у него забрали
     QSet<QHostAddress>  m_blockIp;
     QDateTime startServTime;

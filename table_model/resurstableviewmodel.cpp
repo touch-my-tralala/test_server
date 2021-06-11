@@ -39,7 +39,9 @@ QVariant ResursTableViewModel::headerData(int section, Qt::Orientation orientati
 
 
 QVariant ResursTableViewModel::data(const QModelIndex &index, int role) const{
-    if(!index.isValid() ||
+    if( !index.isValid() || m_resurs.count() <= index.row() || role == Qt::TextAlignmentRole )
+        return Qt::AlignCenter;
+    else if(!index.isValid() ||
        m_resurs.count() <= index.row() ||
        ( role != Qt::DisplayRole && role != Qt::EditRole )
       ){
