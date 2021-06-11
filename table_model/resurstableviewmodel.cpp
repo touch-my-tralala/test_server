@@ -37,7 +37,7 @@ QVariant ResursTableViewModel::headerData(int section, Qt::Orientation orientati
     return QVariant();
 }
 
-
+// https://stackoverflow.com/questions/4958893/how-to-set-text-alignment-on-a-column-of-qtableview-programmatically
 QVariant ResursTableViewModel::data(const QModelIndex &index, int role) const{
     if(!index.isValid() ||
        m_resurs.count() <= index.row() ||
