@@ -1,6 +1,7 @@
 QT       += core gui
 QT       += network
-#QT       += core
+QT       += widgets
+
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -21,14 +22,15 @@ SOURCES += \
     logger/loggerwidget.cpp \
     main.cpp \
     mainwindow.cpp \
-    server.cpp \
+    server/server.cpp \
     table_model/resurstableviewmodel.cpp \
     table_model/usertableviewmodel.cpp
 
 HEADERS += \
     logger/loggerwidget.h \
     mainwindow.h \
-    server.h \
+    server/json_keys.h \
+    server/server.h \
     table_model/resurstableviewmodel.h \
     table_model/usertableviewmodel.h
 

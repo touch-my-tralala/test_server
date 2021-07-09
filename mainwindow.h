@@ -8,6 +8,7 @@
 #include <table_model/resurstableviewmodel.h>
 #include <table_model/usertableviewmodel.h>
 #include <logger/loggerwidget.h>
+#include <QSizePolicy>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }

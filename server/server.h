@@ -1,6 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include "json_keys.h"
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <iostream>
@@ -33,7 +34,7 @@ class Server: public QObject
         ~ResInf(){}
 
         QTime time;
-        QString currentUser = "Free";
+        QString currentUser = JSON_KEYS::State().free;
     };
 /*
 public:

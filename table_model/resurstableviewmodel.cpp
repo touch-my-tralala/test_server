@@ -39,28 +39,44 @@ QVariant ResursTableViewModel::headerData(int section, Qt::Orientation orientati
 
 
 QVariant ResursTableViewModel::data(const QModelIndex &index, int role) const{
-    if( !index.isValid() || m_resurs.count() <= index.row() || role == Qt::TextAlignmentRole )
-        return Qt::AlignCenter;
-    else if(!index.isValid() ||
-       m_resurs.count() <= index.row() ||
-       ( role != Qt::DisplayRole && role != Qt::EditRole )
-      ){
-        return QVariant();
-    }
-    return m_resurs[index.row()][Column( index.column() )];
+    if( index.isValid() && !(m_resurs.count() <= index.row()) ){
+        if(index.column() == SELECTED && role == Qt::CheckStateRole)
+            return m_checked ? Qt::Checked : Qt::Unchecked;
+        if(role == Qt::TextAlignmentRole)
+            return Qt::AlignCenter;
+        if(role == Qt::DisplayRole || role == Qt::EditRole )
+            return m_resurs[index.row()][Column( index.column() )];
+     }
+      return QVariant();
 }
+
+
+bool ResursTableViewModel::setData(const QModelIndex &index, const QVariant &value, int role){
+    if(!index.isValid() || m_resurs.count() <= index.row() || role == Qt::EditRole)
+        return false;
+    if(role == Qt::CheckStateRole)
+        setChecked(value.toBool());
+    else
+        m_resurs[index.row()][Column( index.column() )] = value;
+    dataChanged(index, index);
+    return true;
+}
+
 
 
 Qt::ItemFlags ResursTableViewModel::flags(const QModelIndex &index) const{
+    if(!index.isValid())
+        return 0;
     Qt::ItemFlags flags = QAbstractTableModel::flags(index);
-    if(index.isValid()){
-        if(index.column() == SELECTED){
-            flags |= Qt::ItemIsEditable;
-        }
-    }
+    flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+    if(index.column() == SELECTED)
+        flags |= Qt::ItemIsUserCheckable;
     return flags;
 }
 
+void ResursTableViewModel::setChecked(bool set){
+    m_checked = set;
+}
 
 bool ResursTableViewModel::appendRes(const QString &resName){
     for(auto i: m_resurs){
@@ -71,7 +87,7 @@ bool ResursTableViewModel::appendRes(const QString &resName){
     resurs[NAME] = resName;
     resurs[USER] = "free";
     resurs[TIME] = "00:00:00";
-    resurs[SELECTED] = false;
+    //resurs[SELECTED] = false;
     int row = m_resurs.count();
     beginInsertRows( QModelIndex(), row, row);
     m_resurs.append(resurs);
@@ -102,21 +118,12 @@ bool ResursTableViewModel::setTime(const QString &resName, const QString &resTim
 }
 
 
-bool ResursTableViewModel::setData(const QModelIndex &index, const QVariant &value, int role){
-    if( !index.isValid() || role != Qt::EditRole || m_resurs.count() <= index.row() ){
-        return false;
-    }
-    m_resurs[index.row()][Column( index.column() )] = value;
-    dataChanged(index, index);
-    return true;
-}
-
-
 QStringList ResursTableViewModel::removeSelected(){
     int k = 0;
     QStringList rmvUsers;
     for(auto i = m_resurs.begin(); i != m_resurs.end();){
-        if( i->value( SELECTED, false).toBool() ){ // FIXME тут сначал забирается текущее значение а затем сразу устанавливается новое?
+        qDebug() << i->value(SELECTED);
+        if( i->value( SELECTED, false).toBool() ){
             beginRemoveRows(QModelIndex(), k, k);
             rmvUsers << i->value(NAME).toString();
             i = m_resurs.erase(i);

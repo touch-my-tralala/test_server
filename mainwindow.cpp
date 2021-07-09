@@ -1,12 +1,14 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+// Прочитать про модели в qt. Может стоит сделать чекбокс через qdelegate.
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
+    setWindowTitle("BPOS trecker");
     timer.setInterval(1000);
     connect(&timer, &QTimer::timeout, this, &MainWindow::time_out);
 
@@ -15,7 +17,9 @@ MainWindow::MainWindow(QWidget *parent)
     for(auto i: resList){
         m_res_model->appendRes(i); // FIXME: убрать преобразование строку потом
     }
-    ui->tableViewRes->resizeColumnsToContents();
+    ui->tableViewRes->resizeColumnsToContents();    
+    ui->tableViewRes->setSelectionMode(QAbstractItemView::NoSelection);
+    ui->tableViewRes->setFocusPolicy(Qt::NoFocus);
 
     QStringList usrList = server.getUserList();
     ui->tableViewUsr->setModel(m_usr_model = new UserTableViewModel);
@@ -23,6 +27,8 @@ MainWindow::MainWindow(QWidget *parent)
         m_usr_model->appendUser(i);
     }
     ui->tableViewUsr->resizeColumnsToContents();
+    ui->tableViewUsr->setSelectionMode(QAbstractItemView::NoSelection);
+    ui->tableViewUsr->setFocusPolicy(Qt::NoFocus);
 
     work_time = server.getStartTime();
     qint64 days = work_time.daysTo(QDateTime::currentDateTime());
@@ -90,6 +96,7 @@ void MainWindow::on_tabWidget_currentChanged(int index)
     ui->pushButtonRemove->setEnabled(true);
 
     if(index == 0){
+        ui->lineEdit->clear();
         ui->lineEdit->setPlaceholderText("Type resource name");
     }
 
@@ -100,6 +107,7 @@ void MainWindow::on_tabWidget_currentChanged(int index)
     }
 
     if(index == 2){
+        ui->lineEdit->clear();
         ui->lineEdit->setPlaceholderText("Type user name");
         QStringList usrList = server.getUserList();
         for(auto j: usrList){

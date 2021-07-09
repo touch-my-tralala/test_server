@@ -2,6 +2,7 @@
 #define RESURSTABLEVIEWMODEL_H
 
 #include <QAbstractTableModel>
+#include <QDebug>
 
 class ResursTableViewModel :public QAbstractTableModel
 {
@@ -22,6 +23,10 @@ public slots:
     QStringList removeSelected();
 
 private:
+    void setChecked(bool set);
+
+private:
+    bool m_checked = false;
     enum Column{
         NAME = 0,
         USER,
