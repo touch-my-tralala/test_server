@@ -87,6 +87,7 @@ private:
     quint16 port;
     quint8 maxUsers;
     bool reject_res_req = false;
+    QString m_cur_version;
 
     QMutex mutex;
     QTcpServer m_server;

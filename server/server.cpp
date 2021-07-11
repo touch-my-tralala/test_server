@@ -174,27 +174,31 @@ void Server::removeUsr(QString name){
 
 
 void Server::ini_parse(QString fname){
-    sett = QSharedPointer<QSettings>(new QSettings(QDir::currentPath() + "/" + fname, QSettings::IniFormat)); // FIXME хз как не использовать указатель. не понял как сменить путь.
+    sett = QSharedPointer<QSettings>(new QSettings(QDir::currentPath() + "/" + fname, QSettings::IniFormat));
     if(sett->isWritable()){
         sett->setIniCodec("UTF-8");
-        sett->beginGroup(JSON_KEYS::Config().server_settings);
-        if(sett->contains(JSON_KEYS::Config().port)){
-            port = static_cast<quint16>(sett->value(JSON_KEYS::Config().port, 9292).toUInt());
-        }else{
-            port = 9292;
-            sett->setValue(JSON_KEYS::Config().port, 9292);
+
+        // Инициализация настроек сервера
+        if(sett->contains(JSON_KEYS::Config().server_settings)){
+            sett->beginGroup(JSON_KEYS::Config().server_settings);
+            if(sett->contains(JSON_KEYS::Config().port)){
+                port = static_cast<quint16>(sett->value(JSON_KEYS::Config().port, 9292).toUInt());
+            }else{
+                port = 9292;
+                sett->setValue(JSON_KEYS::Config().port, 9292);
+            }
+
+            if(sett->contains(JSON_KEYS::Config().max_user)){
+                maxUsers = static_cast<quint8>(sett->value(JSON_KEYS::Config().max_user, 5).toUInt());
+            }else{
+                maxUsers = 5;
+                sett->setValue(JSON_KEYS::Config().max_user, 5);
+            }
+            sett->endGroup();
         }
 
-        if(sett->contains(JSON_KEYS::Config().max_user)){
-            maxUsers = static_cast<quint8>(sett->value(JSON_KEYS::Config().max_user, 5).toUInt());
-        }else{
-            maxUsers = 5;
-            sett->setValue(JSON_KEYS::Config().max_user, 5);
-        }
-        sett->endGroup();
-
-        QStringList iniList;
         // Инициализация списка разрешенных пользователей
+        QStringList iniList;
         if(sett->contains(JSON_KEYS::Common().user_list)){
             sett->beginGroup(JSON_KEYS::Common().user_list);
             iniList = sett->childKeys();
@@ -205,6 +209,7 @@ void Server::ini_parse(QString fname){
             sett->endGroup();
         }
 
+        // Инициализация списка ресурсов
         if(sett->contains(JSON_KEYS::Common().resource_list)){
             sett->beginGroup(JSON_KEYS::Common().resource_list);
             iniList = sett->childKeys();
@@ -213,6 +218,13 @@ void Server::ini_parse(QString fname){
                 m_resList.insert(name, ResInf());
             }
             sett->endGroup();
+        }
+
+        // Получение текущей версии приложения
+        if(sett->contains(JSON_KEYS::Config().current_version)){
+            sett->beginGroup(JSON_KEYS::Config().current_version);
+            if(sett->contains(JSON_KEYS::Config().version))
+                m_cur_version = sett->value(JSON_KEYS::Config().version).toString();
         }
    }else{
         emit signalLogEvent("ОШИБКА → ini файл в режиме read-only.");
@@ -324,7 +336,8 @@ void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName
                      {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().authorization},
                      {JSON_KEYS::Common().resnum, resNum},
                      {JSON_KEYS::Common().resuser, resUser},
-                     {JSON_KEYS::Common().busy_time, resTime}
+                     {JSON_KEYS::Common().busy_time, resTime},
+                     {JSON_KEYS::Config().version, m_cur_version}
                      });
     send_to_client(sock, jObj);
 }
@@ -334,7 +347,7 @@ void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName
 void Server::res_req_take(const QJsonObject &jObj){
     QJsonArray resNumReq;   // номер запрашиваемого ресурса
     QJsonArray resStatus;   // ответ на запрашиваемый ресурс
-    QJsonArray resList;      // индекс ресурса (все, не только запрашиваемые)
+    QJsonArray resList;     // индекс ресурса (все, не только запрашиваемые)
     QJsonArray resUser;     // текущий владелец ресурса
     QJsonArray resTime;     // время, которое текущий пользователь занимает ресурс
     qint32 usrTime = static_cast<qint32>(jObj[JSON_KEYS::Common().time].toInt());
@@ -406,7 +419,7 @@ void Server::res_req_take(const QJsonObject &jObj){
 void Server::res_req_free(const QJsonObject &jObj){
     QJsonArray resNumReq;   // номер запрашиваемого ресурса
     QJsonArray resStatus;   // ответ на запрашиваемый ресурс
-    QJsonArray resList;      // индекс ресурса (все, не только запрашиваемые)
+    QJsonArray resList;     // индекс ресурса (все, не только запрашиваемые)
     QJsonArray resUser;     // текущий владелец ресурса
     QJsonArray resTime;     // время, которое текущий пользователь занимает ресурс
     qint64 reqRes = static_cast<qint64>(jObj[JSON_KEYS::ReqType().res_request].toInt());

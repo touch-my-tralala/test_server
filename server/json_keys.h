@@ -9,6 +9,8 @@ public:
         const QString server_settings = "SERVER_SETTINGS";
         const QString port            = "port";
         const QString max_user        = "max_user";
+        const QString current_version = "CURRENT_VERSION";
+        const QString version         = "version";
     }CONFIG;
 
     static const struct Common{
