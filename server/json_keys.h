@@ -1,6 +1,6 @@
 #ifndef JSON_KEYS_H
 #define JSON_KEYS_H
-#include "QString"
+#include <QString>
 
 class JSON_KEYS{
 

@@ -3,12 +3,14 @@
 
 #include <QMainWindow>
 #include <QStandardItemModel>
-//#include <QtCore>
-#include <server.h>
-#include <table_model/resurstableviewmodel.h>
-#include <table_model/usertableviewmodel.h>
-#include <logger/loggerwidget.h>
 #include <QSizePolicy>
+//#include <QtCore>
+
+#include "server/json_keys.h"
+#include "server/server.h"
+#include "table_model/resurstableviewmodel.h"
+#include "table_model/usertableviewmodel.h"
+#include "logger/loggerwidget.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -36,8 +38,6 @@ private slots:
     void on_clearAllBtn_clicked();
     void on_timeoutBtn_clicked();
     void on_tabWidget_currentChanged(int index);
-
-
 
     void on_pushButtonAdd_clicked();
 

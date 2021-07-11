@@ -28,16 +28,21 @@ Server::Server()
 }
 
 Server::~Server(){
-    QStringList saveList;
-    /*for(auto i = m_resList.begin(); i != m_resList.end(); i++){
-        saveList << QString::number(i.key());
-    }*/
-    sett->setValue(JSON_KEYS::Common().resource_list, saveList);
-    saveList.clear();
-    for(auto i =m_userList.begin(); i != m_userList.end(); i++){
-        saveList << i.key();
+    quint16 j = 0;
+    sett->beginGroup(JSON_KEYS::Common().resource_list);
+    for(auto i = m_resList.begin(), end = m_resList.end(); i != end; i++){
+        sett->setValue("res" + QString::number(j), i.key());
+        j++;
     }
-    sett->setValue(JSON_KEYS::Common().user_list, saveList);
+    sett->endGroup();
+
+    j = 0;
+    sett->beginGroup(JSON_KEYS::Common().user_list);
+    for(auto i =m_userList.begin(), end = m_userList.end(); i != end; i++){
+        sett->setValue("usr" + QString::number(j), i.key());
+        j++;
+    }    
+    sett->endGroup();
 
     if(m_server.isListening()){
         m_server.close();
@@ -179,53 +184,48 @@ void Server::ini_parse(QString fname){
         sett->setIniCodec("UTF-8");
 
         // Инициализация настроек сервера
-        if(sett->contains(JSON_KEYS::Config().server_settings)){
-            sett->beginGroup(JSON_KEYS::Config().server_settings);
-            if(sett->contains(JSON_KEYS::Config().port)){
-                port = static_cast<quint16>(sett->value(JSON_KEYS::Config().port, 9292).toUInt());
-            }else{
-                port = 9292;
-                sett->setValue(JSON_KEYS::Config().port, 9292);
-            }
 
-            if(sett->contains(JSON_KEYS::Config().max_user)){
-                maxUsers = static_cast<quint8>(sett->value(JSON_KEYS::Config().max_user, 5).toUInt());
-            }else{
-                maxUsers = 5;
-                sett->setValue(JSON_KEYS::Config().max_user, 5);
-            }
-            sett->endGroup();
+        sett->beginGroup(JSON_KEYS::Config().server_settings);
+        if(sett->contains(JSON_KEYS::Config().port)){
+            port = static_cast<quint16>(sett->value(JSON_KEYS::Config().port, 9292).toUInt());
+        }else{
+            port = 9292;
+            sett->setValue(JSON_KEYS::Config().port, 9292);
         }
+
+        if(sett->contains(JSON_KEYS::Config().max_user)){
+            maxUsers = static_cast<quint8>(sett->value(JSON_KEYS::Config().max_user, 5).toUInt());
+        }else{
+            maxUsers = 5;
+            sett->setValue(JSON_KEYS::Config().max_user, 5);
+        }
+        sett->endGroup();
 
         // Инициализация списка разрешенных пользователей
         QStringList iniList;
-        if(sett->contains(JSON_KEYS::Common().user_list)){
-            sett->beginGroup(JSON_KEYS::Common().user_list);
-            iniList = sett->childKeys();
-            for (auto i : iniList){
-                auto name = sett->value(i, "no_data").toString().toLower();
-                m_userList.insert(name, UserInf());
-            }
-            sett->endGroup();
+
+        sett->beginGroup(JSON_KEYS::Common().user_list);
+        iniList = sett->childKeys();
+        for (auto i : iniList){
+            auto name = sett->value(i, "no_data").toString().toLower();
+            m_userList.insert(name, UserInf());
         }
+        sett->endGroup();
 
         // Инициализация списка ресурсов
-        if(sett->contains(JSON_KEYS::Common().resource_list)){
-            sett->beginGroup(JSON_KEYS::Common().resource_list);
-            iniList = sett->childKeys();
-            for(auto i: iniList){
-                auto name = sett->value(i, "no_data").toString().toLower();
-                m_resList.insert(name, ResInf());
-            }
-            sett->endGroup();
+        sett->beginGroup(JSON_KEYS::Common().resource_list);
+        iniList = sett->childKeys();
+        for(auto i: iniList){
+            auto name = sett->value(i, "no_data").toString().toLower();
+            m_resList.insert(name, ResInf());
         }
+        sett->endGroup();
 
         // Получение текущей версии приложения
-        if(sett->contains(JSON_KEYS::Config().current_version)){
-            sett->beginGroup(JSON_KEYS::Config().current_version);
-            if(sett->contains(JSON_KEYS::Config().version))
-                m_cur_version = sett->value(JSON_KEYS::Config().version).toString();
-        }
+        sett->beginGroup(JSON_KEYS::Config().current_version);
+        if(sett->contains(JSON_KEYS::Config().version))
+            m_cur_version = sett->value(JSON_KEYS::Config().version).toString();
+
    }else{
         emit signalLogEvent("ОШИБКА → ini файл в режиме read-only.");
     }
