@@ -3,12 +3,14 @@
 
 #include <QMainWindow>
 #include <QStandardItemModel>
+#include <QSizePolicy>
 //#include <QtCore>
-#include <server.h>
-#include <mytableviewmodel.h>
-#include <table_model/resurstableviewmodel.h>
-#include <table_model/usertableviewmodel.h>
-#include <logger/loggerwidget.h>
+
+#include "server/json_keys.h"
+#include "server/server.h"
+#include "table_model/resurstableviewmodel.h"
+#include "table_model/usertableviewmodel.h"
+#include "logger/loggerwidget.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -37,9 +39,9 @@ private slots:
     void on_timeoutBtn_clicked();
     void on_tabWidget_currentChanged(int index);
 
-    void on_addAuthorizedUsrBtn_clicked();
+    void on_pushButtonAdd_clicked();
 
-    void on_deleteAuthorizedUsrBtn_clicked();
+    void on_pushButtonRemove_clicked();
 
 private:
     qint32 busyTime;
@@ -52,7 +54,7 @@ private:
     //MyTableViewModel* m_model;
     UserTableViewModel* m_usr_model;
     ResursTableViewModel* m_res_model;
-    QMap<quint8, ResInf> res_inf;
+    QMap<QString, ResInf> res_inf;
 
 };
 #endif // MAINWINDOW_H

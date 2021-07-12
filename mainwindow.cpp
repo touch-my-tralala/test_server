@@ -1,27 +1,34 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+// Прочитать про модели в qt. Может стоит сделать чекбокс через qdelegate.
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
+    setWindowTitle("BPOS trecker");
     timer.setInterval(1000);
     connect(&timer, &QTimer::timeout, this, &MainWindow::time_out);
 
-    QList<quint8> resList = server.getResList();
+    QStringList resList = server.getResList();
     ui->tableViewRes->setModel(m_res_model = new ResursTableViewModel);
-    for(auto i=0; i < resList.size(); i++){
-        m_res_model->appendRes(QString::number(resList[i])); // FIXME: убрать преобразование строку потом
+    for(auto i: resList){
+        m_res_model->appendRes(i); // FIXME: убрать преобразование строку потом
     }
+    ui->tableViewRes->resizeColumnsToContents();    
+    ui->tableViewRes->setSelectionMode(QAbstractItemView::NoSelection);
+    ui->tableViewRes->setFocusPolicy(Qt::NoFocus);
 
     QStringList usrList = server.getUserList();
     ui->tableViewUsr->setModel(m_usr_model = new UserTableViewModel);
-    for(auto i = 0; i < usrList.size(); i++){
-        m_usr_model->appendUser(usrList[i]);
+    for(auto i: usrList){
+        m_usr_model->appendUser(i);
     }
     ui->tableViewUsr->resizeColumnsToContents();
+    ui->tableViewUsr->setSelectionMode(QAbstractItemView::NoSelection);
+    ui->tableViewUsr->setFocusPolicy(Qt::NoFocus);
 
     work_time = server.getStartTime();
     qint64 days = work_time.daysTo(QDateTime::currentDateTime());
@@ -71,9 +78,9 @@ void MainWindow::on_timeoutBtn_clicked()
 void MainWindow::time_out(){
     for(auto i = res_inf.begin(); i != res_inf.end(); i++){
         res_inf[i.key()].currentUser = server.getResUser(i.key());
-        m_res_model->setUser(QString::number(i.key()), res_inf[i.key()].currentUser);
+        m_res_model->setUser(i.key(), res_inf[i.key()].currentUser);
         busyTime = server.getBusyResTime(i.key());
-        m_res_model->setTime(QString::number(i.key()), QTime(0, 0, 0).addSecs(busyTime).toString("hh:mm:ss"));
+        m_res_model->setTime(i.key(), QTime(0, 0, 0).addSecs(busyTime).toString("hh:mm:ss"));
     }
 
     qint64 days = work_time.daysTo(QDateTime::currentDateTime());
@@ -84,7 +91,24 @@ void MainWindow::time_out(){
 
 void MainWindow::on_tabWidget_currentChanged(int index)
 {
+    ui->lineEdit->setEnabled(true);
+    ui->pushButtonAdd->setEnabled(true);
+    ui->pushButtonRemove->setEnabled(true);
+
+    if(index == 0){
+        ui->lineEdit->clear();
+        ui->lineEdit->setPlaceholderText("Type resource name");
+    }
+
+    if(index == 1){
+        ui->lineEdit->setEnabled(false);
+        ui->pushButtonAdd->setEnabled(false);
+        ui->pushButtonRemove->setEnabled(false);
+    }
+
     if(index == 2){
+        ui->lineEdit->clear();
+        ui->lineEdit->setPlaceholderText("Type user name");
         QStringList usrList = server.getUserList();
         for(auto j: usrList){
             m_usr_model->appendUser(j);
@@ -93,22 +117,38 @@ void MainWindow::on_tabWidget_currentChanged(int index)
 }
 
 
-void MainWindow::on_addAuthorizedUsrBtn_clicked()
-{   // FIXME курсор в рамке текста можно поставить в любом месте, а надо чтобы он двигался только по мере текста
+void MainWindow::on_pushButtonAdd_clicked()
+{
     QString text = ui->lineEdit->text();
-    bool answ = m_usr_model->appendUser(text);
-    if(answ){
-        server.addNewUsrName(ui->lineEdit->text().toLower());
+    if(ui->tabWidget->currentIndex() == 0){
+        if( m_res_model->appendRes(text) )
+            server.addNewRes(text); // FIXME изменить потом на строку
+        ui->lineEdit->clear();
     }
-    ui->lineEdit->clear();
+
+    if(ui->tabWidget->currentIndex() == 2){
+        bool answ = m_usr_model->appendUser(text);
+        if(answ){
+            server.addNewUsrName(ui->lineEdit->text().toLower());
+        }
+        ui->lineEdit->clear();
+    }
 }
 
-
-void MainWindow::on_deleteAuthorizedUsrBtn_clicked()
+void MainWindow::on_pushButtonRemove_clicked()
 {
-    QStringList rmvUsers;    
-    rmvUsers = m_usr_model->removeSelected();
-    for(auto i: rmvUsers){
-        server.removeUsr(i);
+    QStringList rmvList;
+    if(ui->tabWidget->currentIndex() == 0){
+        rmvList = m_res_model->removeSelected();
+        for(auto i: rmvList){
+            server.removeRes(i);
+        }
+    }
+
+    if(ui->tabWidget->currentIndex() == 2){
+        rmvList = m_usr_model->removeSelected();
+        for(auto i: rmvList){
+            server.removeUsr(i);
+        }
     }
 }
