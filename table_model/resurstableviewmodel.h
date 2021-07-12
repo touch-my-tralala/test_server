@@ -4,30 +4,30 @@
 #include <QAbstractTableModel>
 #include <QDebug>
 
-class ResursTableViewModel :public QAbstractTableModel
+class ResursTableViewModel : public QAbstractTableModel
 {
     Q_OBJECT
 public:
-    ResursTableViewModel(QObject* parent = 0);
-    int rowCount(const QModelIndex& parent) const;
-    int columnCount(const QModelIndex& parent) const;
-    QVariant data(const QModelIndex& index, int role ) const;
-    bool setData( const QModelIndex& index, const QVariant& value, int role );
-    QVariant headerData( int section, Qt::Orientation orientation, int role ) const;
-    Qt::ItemFlags flags( const QModelIndex& index ) const;
-    bool appendRes(const QString& resName);
-    bool setUser(const QString &resName, const QString &usrName);
-    bool setTime(const QString &resName, const QString &resTime);
+    ResursTableViewModel(QObject* parent = nullptr);
+    int           rowCount(const QModelIndex& parent) const override;
+    int           columnCount(const QModelIndex& parent) const override;
+    QVariant      data(const QModelIndex& index, int role) const override;
+    bool          setData(const QModelIndex& index, const QVariant& value, int role) override;
+    QVariant      headerData(int section, Qt::Orientation orientation, int role) const override;
+    Qt::ItemFlags flags(const QModelIndex& index) const override;
+    bool          appendRes(const QString& resName);
+    bool          setUser(const QString& resName, const QString& usrName);
+    bool          setTime(const QString& resName, const QString& resTime);
 
 public slots:
     QStringList removeSelected();
 
 private:
-    void setChecked(bool set);
+    void setChecked(const QModelIndex& index, bool val);
 
 private:
-    bool m_checked = false;
-    enum Column{
+    enum Column
+    {
         NAME = 0,
         USER,
         TIME,
@@ -36,7 +36,8 @@ private:
     };
 
     typedef QHash<Column, QVariant> ResData;
-    QList<ResData> m_resurs;
+    QList<ResData>                  m_resurs;
+    QMap<QModelIndex, bool>         m_checked_map;
 };
 
 #endif // RESURSTABLEVIEWMODEL_H

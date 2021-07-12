@@ -1,86 +1,93 @@
 #include "resurstableviewmodel.h"
 
-ResursTableViewModel::ResursTableViewModel(QObject* parent): QAbstractTableModel( parent ){
-
+ResursTableViewModel::ResursTableViewModel(QObject* parent)
+    : QAbstractTableModel(parent)
+{
 }
 
-
-int ResursTableViewModel::rowCount(const QModelIndex &parent) const{
+int ResursTableViewModel::rowCount(const QModelIndex& parent) const
+{
     Q_UNUSED(parent)
     return m_resurs.count();
 }
 
-
-int ResursTableViewModel::columnCount(const QModelIndex &parent) const{
+int ResursTableViewModel::columnCount(const QModelIndex& parent) const
+{
     Q_UNUSED(parent)
     return LAST;
 }
 
-
-QVariant ResursTableViewModel::headerData(int section, Qt::Orientation orientation, int role) const{
-    if(role != Qt::DisplayRole){
+QVariant ResursTableViewModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+    if (role != Qt::DisplayRole)
+    {
         return QVariant();
     }
-    if(orientation == Qt::Vertical){
+    if (orientation == Qt::Vertical)
+    {
         return section;
     }
-    switch (section) {
-    case NAME:
-        return "Имя";
-    case USER:
-        return "Пользователь";
-    case TIME:
-        return "Время использования";
-    case SELECTED:
-        return "Выбор";
+    switch (section)
+    {
+        case NAME:
+            return "Имя";
+        case USER:
+            return "Пользователь";
+        case TIME:
+            return "Время использования";
+        case SELECTED:
+            return "Выбор";
     }
     return QVariant();
 }
 
-
-QVariant ResursTableViewModel::data(const QModelIndex &index, int role) const{
-    if( index.isValid() && !(m_resurs.count() <= index.row()) ){
-        if(index.column() == SELECTED && role == Qt::CheckStateRole)
-            return m_checked ? Qt::Checked : Qt::Unchecked;
-        if(role == Qt::TextAlignmentRole)
+QVariant ResursTableViewModel::data(const QModelIndex& index, int role) const
+{
+    if (index.isValid() && !(m_resurs.count() <= index.row()))
+    {
+        if (index.column() == SELECTED && role == Qt::CheckStateRole)
+            return m_checked_map[index] ? Qt::Checked : Qt::Unchecked;
+        if (role == Qt::TextAlignmentRole)
             return Qt::AlignCenter;
-        if(role == Qt::DisplayRole || role == Qt::EditRole )
-            return m_resurs[index.row()][Column( index.column() )];
-     }
-      return QVariant();
+        if (role == Qt::DisplayRole || role == Qt::EditRole)
+            return m_resurs[index.row()][Column(index.column())];
+    }
+    return QVariant();
 }
 
-
-bool ResursTableViewModel::setData(const QModelIndex &index, const QVariant &value, int role){
-    if(!index.isValid() || m_resurs.count() <= index.row() || role == Qt::EditRole)
+bool ResursTableViewModel::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+    if (!index.isValid() || m_resurs.count() <= index.row() || role == Qt::EditRole)
         return false;
-    if(role == Qt::CheckStateRole)
-        setChecked(value.toBool());
+    if (role == Qt::CheckStateRole)
+        setChecked(index, value.toBool());
     else
-        m_resurs[index.row()][Column( index.column() )] = value;
+        m_resurs[index.row()][Column(index.column())] = value;
     dataChanged(index, index);
     return true;
 }
 
-
-
-Qt::ItemFlags ResursTableViewModel::flags(const QModelIndex &index) const{
-    if(!index.isValid())
-        return 0;
+Qt::ItemFlags ResursTableViewModel::flags(const QModelIndex& index) const
+{
+    if (!index.isValid())
+        return {};
     Qt::ItemFlags flags = QAbstractTableModel::flags(index);
-    flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
-    if(index.column() == SELECTED)
+    flags               = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+    if (index.column() == SELECTED)
         flags |= Qt::ItemIsUserCheckable;
     return flags;
 }
 
-void ResursTableViewModel::setChecked(bool set){
-    m_checked = set;
+void ResursTableViewModel::setChecked(const QModelIndex& index, bool val)
+{
+    m_checked_map.insert(index, val);
 }
 
-bool ResursTableViewModel::appendRes(const QString &resName){
-    for(auto i: m_resurs){
-        if(i[NAME] == resName)
+bool ResursTableViewModel::appendRes(const QString& resName)
+{
+    for (auto& i : m_resurs)
+    {
+        if (i[NAME] == resName)
             return false;
     }
     ResData resurs;
@@ -88,17 +95,19 @@ bool ResursTableViewModel::appendRes(const QString &resName){
     resurs[USER] = "free";
     resurs[TIME] = "00:00:00";
     //resurs[SELECTED] = false;
-    int row = m_resurs.count();
-    beginInsertRows( QModelIndex(), row, row);
+    auto row = m_resurs.count();
+    beginInsertRows(QModelIndex(), row, row);
     m_resurs.append(resurs);
     endInsertRows();
     return true;
 }
 
-
-bool ResursTableViewModel::setUser(const QString &resName, const QString &usrName){
-    for(auto i: m_resurs){
-        if(i[NAME] == resName){
+bool ResursTableViewModel::setUser(const QString& resName, const QString& usrName)
+{
+    for (auto& i : m_resurs)
+    {
+        if (i[NAME] == resName)
+        {
             i[USER] = usrName;
             return true;
         }
@@ -106,10 +115,12 @@ bool ResursTableViewModel::setUser(const QString &resName, const QString &usrNam
     return false;
 }
 
-
-bool ResursTableViewModel::setTime(const QString &resName, const QString &resTime){
-    for(auto i: m_resurs){
-        if(i[NAME] == resName){
+bool ResursTableViewModel::setTime(const QString& resName, const QString& resTime)
+{
+    for (auto& i : m_resurs)
+    {
+        if (i[NAME] == resName)
+        {
             i[TIME] = resTime;
             return true;
         }
@@ -117,18 +128,22 @@ bool ResursTableViewModel::setTime(const QString &resName, const QString &resTim
     return false;
 }
 
-
-QStringList ResursTableViewModel::removeSelected(){
-    int k = 0;
+QStringList ResursTableViewModel::removeSelected()
+{
+    int         k = 0;
     QStringList rmvUsers;
-    for(auto i = m_resurs.begin(); i != m_resurs.end();){
+    for (auto i = m_resurs.begin(); i != m_resurs.end();)
+    {
         qDebug() << i->value(SELECTED);
-        if( i->value( SELECTED, false).toBool() ){
+        if (i->value(SELECTED, false).toBool())
+        {
             beginRemoveRows(QModelIndex(), k, k);
             rmvUsers << i->value(NAME).toString();
             i = m_resurs.erase(i);
             endRemoveRows();
-        }else{
+        }
+        else
+        {
             ++k;
             ++i;
         }
