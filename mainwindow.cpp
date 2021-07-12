@@ -21,6 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
     for(auto i = 0; i < usrList.size(); i++){
         m_usr_model->appendUser(usrList[i]);
     }
+    ui->tableViewUsr->resizeColumnsToContents();
 
     work_time = server.getStartTime();
     qint64 days = work_time.daysTo(QDateTime::currentDateTime());
@@ -94,12 +95,12 @@ void MainWindow::on_tabWidget_currentChanged(int index)
 
 void MainWindow::on_addAuthorizedUsrBtn_clicked()
 {   // FIXME курсор в рамке текста можно поставить в любом месте, а надо чтобы он двигался только по мере текста
-    QString text = ui->userNameLineEdit->text();
+    QString text = ui->lineEdit->text();
     bool answ = m_usr_model->appendUser(text);
     if(answ){
-        server.addNewUsrName(ui->userNameLineEdit->text().toLower());
+        server.addNewUsrName(ui->lineEdit->text().toLower());
     }
-    ui->userNameLineEdit->clear();
+    ui->lineEdit->clear();
 }
 
 
