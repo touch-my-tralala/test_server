@@ -1,5 +1,6 @@
 #include "usertableviewmodel.h"
 
+// FIXME: реализовать model-view-controller паттерн
 UserTableViewModel::UserTableViewModel(QObject* parent)
     : QAbstractTableModel(parent)
 {
@@ -39,28 +40,49 @@ QVariant UserTableViewModel::headerData(int section, Qt::Orientation orientation
 
 QVariant UserTableViewModel::data(const QModelIndex& index, int role) const
 {
-    if (!index.isValid() || m_users.count() <= index.row() || role == Qt::TextAlignmentRole)
-        return Qt::AlignCenter;
-    if (!index.isValid() ||
-        m_users.count() <= index.row() ||
-        (role != Qt::DisplayRole && role != Qt::EditRole))
+    if(index.isValid() && !(m_users.count() <= index.row()))
     {
-        return QVariant();
+        if(index.column() == SELECTED && role == Qt::CheckStateRole)
+            return m_users[index.row()][SELECTED].toBool() ? Qt::Checked : Qt::Unchecked;
+
+        if(role == Qt::TextAlignmentRole)
+            return Qt::AlignCenter;
+
+        if((role == Qt::DisplayRole || role == Qt::EditRole) && index.column() != SELECTED)
+            return m_users[index.row()][Column(index.column())];
     }
-    return m_users[index.row()][Column(index.column())];
+    return QVariant();
+}
+
+bool UserTableViewModel::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+    if (!index.isValid() ||  m_users.count() <= index.row() || role != Qt::EditRole)
+        return false;
+
+    if(role == Qt::CheckStateRole)
+        setChecked(index, value.toBool());
+    else
+        m_users[index.row()][Column(index.column())] = value;
+    emit dataChanged(index, index);
+    return true;
 }
 
 Qt::ItemFlags UserTableViewModel::flags(const QModelIndex& index) const
 {
+    if(!index.isValid())
+        return{};
     Qt::ItemFlags flags = QAbstractTableModel::flags(index);
-    if (index.isValid())
-    {
-        if (index.column() == SELECTED)
-        {
-            flags |= Qt::ItemIsEditable;
-        }
-    }
+    flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+
+    if(index.column() == SELECTED)
+        flags |= Qt::ItemIsUserCheckable;
+
     return flags;
+}
+
+void UserTableViewModel::setChecked(const QModelIndex& index, bool val)
+{
+    m_users[index.row()][SELECTED] = val;
 }
 
 bool UserTableViewModel::appendUser(const QString& usrName)
@@ -72,22 +94,10 @@ bool UserTableViewModel::appendUser(const QString& usrName)
     }
     UserData user;
     user[NAME]     = usrName;
-    user[SELECTED] = false;
     int row        = m_users.count();
     beginInsertRows(QModelIndex(), row, row);
     m_users.append(user);
     endInsertRows();
-    return true;
-}
-
-bool UserTableViewModel::setData(const QModelIndex& index, const QVariant& value, int role)
-{
-    if (!index.isValid() || role != Qt::EditRole || m_users.count() <= index.row())
-    {
-        return false;
-    }
-    m_users[index.row()][Column(index.column())] = value;
-    emit dataChanged(index, index);
     return true;
 }
 

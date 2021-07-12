@@ -21,6 +21,9 @@ public slots:
     QStringList removeSelected();
 
 private:
+    void setChecked(const QModelIndex& index, bool val);
+
+private:
     enum Column
     {
         NAME = 0,

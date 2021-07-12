@@ -46,13 +46,12 @@ QVariant ResursTableViewModel::data(const QModelIndex& index, int role) const
     if (index.isValid() && !(m_resurs.count() <= index.row()))
     {
         if (index.column() == SELECTED && role == Qt::CheckStateRole)
-
             return m_resurs[index.row()][SELECTED].toBool() ? Qt::Checked : Qt::Unchecked;
 
         if (role == Qt::TextAlignmentRole)
             return Qt::AlignCenter;
 
-        if (role == Qt::DisplayRole || role == Qt::EditRole)
+        if ((role == Qt::DisplayRole || role == Qt::EditRole) && index.column() != SELECTED)
             return m_resurs[index.row()][Column(index.column())];
     }
     return QVariant();
@@ -66,7 +65,7 @@ bool ResursTableViewModel::setData(const QModelIndex& index, const QVariant& val
         setChecked(index, value.toBool());
     else
         m_resurs[index.row()][Column(index.column())] = value;
-    dataChanged(index, index);
+    emit dataChanged(index, index);
     return true;
 }
 
@@ -76,8 +75,10 @@ Qt::ItemFlags ResursTableViewModel::flags(const QModelIndex& index) const
         return {};
     Qt::ItemFlags flags = QAbstractTableModel::flags(index);
     flags               = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+
     if (index.column() == SELECTED)
         flags |= Qt::ItemIsUserCheckable;
+
     return flags;
 }
 
@@ -97,8 +98,6 @@ bool ResursTableViewModel::appendRes(const QString& resName)
     resurs[NAME] = resName;
     resurs[USER] = "free";
     resurs[TIME] = "00:00:00";
-    // наверное тут перегнул палку, надо как-то избавиться от qsharepointer
-    resurs[SELECTED] = QVariant(QSharedPointer<QCheckBox>(new QCheckBox()));
     auto row         = m_resurs.count();
     beginInsertRows(QModelIndex(), row, row);
     m_resurs.append(resurs);
@@ -138,7 +137,6 @@ QStringList ResursTableViewModel::removeSelected()
     QStringList rmvUsers;
     for (auto i = m_resurs.begin(); i != m_resurs.end();)
     {
-        qDebug() << i->value(SELECTED);
         if (i->value(SELECTED, false).toBool())
         {
             beginRemoveRows(QModelIndex(), k, k);

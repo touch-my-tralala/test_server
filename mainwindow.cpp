@@ -16,7 +16,7 @@ MainWindow::MainWindow(QWidget* parent)
     QStringList resList = server.getResList();
     ui->tableViewRes->setModel(m_res_model = new ResursTableViewModel);
     for (auto& i : resList)
-        m_res_model->appendRes(i); // FIXME: убрать преобразование строку потом
+        m_res_model->appendRes(i);
 
     ui->tableViewRes->resizeColumnsToContents();
     ui->tableViewRes->setSelectionMode(QAbstractItemView::NoSelection);
