@@ -98,7 +98,7 @@ QStringList UserTableViewModel::removeSelected()
     for (auto i = m_users.begin(); i != m_users.end();)
     {
         if (i->value(SELECTED, false).toBool())
-        { // FIXME тут сначал забирается текущее значение а затем сразу устанавливается новое?
+        {
             beginRemoveRows(QModelIndex(), k, k);
             rmvUsers << i->value(NAME).toString();
             i = m_users.erase(i);

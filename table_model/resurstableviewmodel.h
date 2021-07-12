@@ -2,6 +2,7 @@
 #define RESURSTABLEVIEWMODEL_H
 
 #include <QAbstractTableModel>
+#include <QCheckBox>
 #include <QDebug>
 
 class ResursTableViewModel : public QAbstractTableModel
@@ -37,7 +38,6 @@ private:
 
     typedef QHash<Column, QVariant> ResData;
     QList<ResData>                  m_resurs;
-    QMap<QModelIndex, bool>         m_checked_map;
 };
 
 #endif // RESURSTABLEVIEWMODEL_H

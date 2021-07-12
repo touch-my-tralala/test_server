@@ -46,9 +46,12 @@ QVariant ResursTableViewModel::data(const QModelIndex& index, int role) const
     if (index.isValid() && !(m_resurs.count() <= index.row()))
     {
         if (index.column() == SELECTED && role == Qt::CheckStateRole)
-            return m_checked_map[index] ? Qt::Checked : Qt::Unchecked;
+
+            return m_resurs[index.row()][SELECTED].toBool() ? Qt::Checked : Qt::Unchecked;
+
         if (role == Qt::TextAlignmentRole)
             return Qt::AlignCenter;
+
         if (role == Qt::DisplayRole || role == Qt::EditRole)
             return m_resurs[index.row()][Column(index.column())];
     }
@@ -80,7 +83,7 @@ Qt::ItemFlags ResursTableViewModel::flags(const QModelIndex& index) const
 
 void ResursTableViewModel::setChecked(const QModelIndex& index, bool val)
 {
-    m_checked_map.insert(index, val);
+    m_resurs[index.row()][SELECTED] = val;
 }
 
 bool ResursTableViewModel::appendRes(const QString& resName)
@@ -94,8 +97,9 @@ bool ResursTableViewModel::appendRes(const QString& resName)
     resurs[NAME] = resName;
     resurs[USER] = "free";
     resurs[TIME] = "00:00:00";
-    //resurs[SELECTED] = false;
-    auto row = m_resurs.count();
+    // наверное тут перегнул палку, надо как-то избавиться от qsharepointer
+    resurs[SELECTED] = QVariant(QSharedPointer<QCheckBox>(new QCheckBox()));
+    auto row         = m_resurs.count();
     beginInsertRows(QModelIndex(), row, row);
     m_resurs.append(resurs);
     endInsertRows();

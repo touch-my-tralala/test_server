@@ -144,17 +144,13 @@ void MainWindow::on_pushButtonRemove_clicked()
     {
         rmvList = m_res_model->removeSelected();
         for (auto& i : rmvList)
-        {
             server.removeRes(i);
-        }
     }
 
     if (ui->tabWidget->currentIndex() == 2)
     {
         rmvList = m_usr_model->removeSelected();
         for (auto& i : rmvList)
-        {
             server.removeUsr(i);
-        }
     }
 }
