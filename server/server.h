@@ -36,13 +36,6 @@ class Server: public QObject
         QTime time;
         QString currentUser = JSON_KEYS::State().free;
     };
-/*
-public:
-    struct Keys{
-        const QString port = "port";
-        const QString max_user = "max_user";
-        const QString
-    }; */
 
 public:
     Server();
@@ -84,8 +77,8 @@ private:
     qint64 maxBusyTime = 7200; // 2 часа
     const qint64 numReadByte = 32;
     quint32 m_nextBlock = 0;
-    quint16 port;
-    quint8 maxUsers;
+    quint16 m_port;
+    quint8 m_max_users;
     bool reject_res_req = false;
     QString m_cur_version;
 

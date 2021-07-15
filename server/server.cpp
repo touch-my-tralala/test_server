@@ -2,23 +2,21 @@
 
 /* Что осталось доделать:
  * 2) время последней транзакции от клиента
- * 3) вместо строчных литералов сделать структуру ключей
- * 4) заполнение ini файла не верно работает.
 */
 
 Server::Server()
 {
     Server::ini_parse("init.ini");
 
-    emit signalLogEvent("Server → Максимальное количество пользователей - " + QString::number(maxUsers) + ".");
+    emit signalLogEvent("Server → Максимальное количество пользователей - " + QString::number(m_max_users) + ".");
 
-    m_server.setMaxPendingConnections(maxUsers);
+    m_server.setMaxPendingConnections(m_max_users);
 
-    if(!m_server.listen(QHostAddress::Any, port)){
+    if(!m_server.listen(QHostAddress::Any, m_port)){
         emit signalLogEvent("ОШИБКА → Прослушивание порта невозможно.");
         return;
     }else{
-        emit signalLogEvent("Server → порт - " + QString::number(port) + ".");
+        emit signalLogEvent("Server → порт - " + QString::number(m_port) + ".");
     }
     connect(&m_server, &QTcpServer::newConnection,
             this, &Server::on_slotNewConnection);
@@ -29,6 +27,8 @@ Server::Server()
 
 Server::~Server(){
     quint16 j = 0;
+
+    sett->clear();
     sett->beginGroup(JSON_KEYS::Common().resource_list);
     for(auto i = m_resList.begin(), end = m_resList.end(); i != end; i++){
         sett->setValue("res" + QString::number(j), i.key());
@@ -44,6 +44,15 @@ Server::~Server(){
     }    
     sett->endGroup();
 
+    sett->beginGroup(JSON_KEYS::Config().server_settings);
+    sett->setValue(JSON_KEYS::Config().port, m_port);
+    sett->setValue(JSON_KEYS::Config().max_user, m_max_users);
+    sett->endGroup();
+
+    sett->beginGroup(JSON_KEYS::Config().current_version);
+    sett->setValue(JSON_KEYS::Config().version, m_cur_version);
+    sett->endGroup();
+
     if(m_server.isListening()){
         m_server.close();
     }
@@ -55,7 +64,7 @@ void Server::setTimeOut(qint64 secs){
 }
 
 void Server::setMaxUser(quint8 maxUsers){
-    this->maxUsers = maxUsers;
+    this->m_max_users = maxUsers;
     emit signalLogEvent("Server → Макс. количество пользователей "
                         + QString::number(maxUsers) + " успешно установлено.");
 }
@@ -187,16 +196,16 @@ void Server::ini_parse(QString fname){
 
         sett->beginGroup(JSON_KEYS::Config().server_settings);
         if(sett->contains(JSON_KEYS::Config().port)){
-            port = static_cast<quint16>(sett->value(JSON_KEYS::Config().port, 9292).toUInt());
+            m_port = static_cast<quint16>(sett->value(JSON_KEYS::Config().port, 9292).toUInt());
         }else{
-            port = 9292;
+            m_port = 9292;
             sett->setValue(JSON_KEYS::Config().port, 9292);
         }
 
         if(sett->contains(JSON_KEYS::Config().max_user)){
-            maxUsers = static_cast<quint8>(sett->value(JSON_KEYS::Config().max_user, 5).toUInt());
+            m_max_users = static_cast<quint8>(sett->value(JSON_KEYS::Config().max_user, 5).toUInt());
         }else{
-            maxUsers = 5;
+            m_max_users = 5;
             sett->setValue(JSON_KEYS::Config().max_user, 5);
         }
         sett->endGroup();
@@ -225,6 +234,7 @@ void Server::ini_parse(QString fname){
         sett->beginGroup(JSON_KEYS::Config().current_version);
         if(sett->contains(JSON_KEYS::Config().version))
             m_cur_version = sett->value(JSON_KEYS::Config().version).toString();
+        sett->endGroup();
 
    }else{
         emit signalLogEvent("ОШИБКА → ini файл в режиме read-only.");

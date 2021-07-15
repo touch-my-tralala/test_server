@@ -45,8 +45,9 @@ QVariant ResursTableViewModel::data(const QModelIndex& index, int role) const
 {
     if (index.isValid() && !(m_resurs.count() <= index.row()))
     {
-        if (index.column() == SELECTED && role == Qt::CheckStateRole)
+        if (index.column() == SELECTED && role == Qt::CheckStateRole){
             return m_resurs[index.row()][SELECTED].toBool() ? Qt::Checked : Qt::Unchecked;
+        }
 
         if (role == Qt::TextAlignmentRole)
             return Qt::AlignCenter;
