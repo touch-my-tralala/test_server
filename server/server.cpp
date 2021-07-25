@@ -376,8 +376,6 @@ void Server::res_req_take(const QJsonObject &jObj){
                 i.value().time = QTime(0, 0, 0).addSecs(usrTime);
                 resNumReq.push_back(i.key());
                 resStatus.push_back(1);
-                // вызов потоко-небезопасной функции
-                registr(usrName.toUtf8().constData(), idx);
             // ресурс занят, но по таймауту можно перехватить
             }else if(diffTime > maxBusyTime && !reject_res_req){
                 QString old_user = i.value().currentUser;
@@ -385,8 +383,6 @@ void Server::res_req_take(const QJsonObject &jObj){
                 i.value().time = QTime(0, 0, 0).addSecs(usrTime);
                 resNumReq.push_back(i.key());
                 resStatus.push_back(1);
-                // вызов потоко-небезопасной функции
-                registr(usrName.toUtf8().constData(), idx);
 
                 // Составление списка пользователей у которых забрали ресурсы.
                 if(m_grabRes.contains(old_user)){
@@ -496,17 +492,6 @@ void Server::send_to_all_clients(){
             i.value().socket->write(jsonDoc.toJson(QJsonDocument::Compact));
         }
     }
-}
-
-
-bool Server::registr(const std::string &username, uint32_t resource_index){
-    Q_UNUSED(username)
-    Q_UNUSED(resource_index)
-    // потоко-небезопасная функция
-    mutex.lock();
-    // действия
-    mutex.unlock();
-    return true;
 }
 
 

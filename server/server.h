@@ -40,22 +40,35 @@ class Server: public QObject
 public:
     Server();
     ~Server() override;
+    //! Установка времени после которого можно перехватить ресурс
     void setTimeOut(qint64 secs);
     void setMaxUser(quint8 maxUser);
+    //! Установка режима отклонения входящих подключений
     void setRejectConnection(bool a);
+    //! Установка режима отклонения запросов ресурсов
     void setRejectResReq(bool a);
+    //! список доступных ресурсов
     QStringList getResList();
+    //! список разрешенных пользователей
     QStringList getUserList();
     QString getResUser(QString resName);
+    //! время сколько ресурс занят
     qint32 getBusyResTime(QString resName);
+    //! время старта сервера
     const QDateTime& getStartTime() const;
+    //! освобождение всех ресурсов
     void allResClear();
+    //! добовления нового ресурса
     void addNewRes(QString resName);
+    //! добовления нового разрешенного пользователя
     void addNewUsrName(QString name);
+    //! удаление ресурса
     void removeRes(QString resName);
+    //! удаления пользователя из списка разрешенных
     void removeUsr(QString name);
 
 signals:
+    //! сигнал для логгера
     void signalLogEvent(QString s);
 
 private slots:
@@ -64,12 +77,16 @@ private slots:
     void on_slotDisconnected();
 
 private:
+    //! парсинг конфигурации из файла
     void ini_parse(QString fname);
+    //! отправка одному клиенту
     void send_to_client(QTcpSocket &sock, const QJsonObject &jObj);
+    //! широковещательная рассылка всем подключенным клиентам
     void send_to_all_clients();
-    bool registr(const std::string &username, uint32_t resource_index);
     void json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket);
+    //! резервирование ресурса за пользователем
     void res_req_take(const QJsonObject &jObj);
+    //! освобождение ресурса от пользователя
     void res_req_free(const QJsonObject &jObj);
     void new_client_autorization(QTcpSocket &sock, const QString &newUsrName);
 
