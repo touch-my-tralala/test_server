@@ -30,6 +30,7 @@ public:
         const QString action = "action";
         const QString leave  = "leave";
         const QString take   = "take";
+
     }ACTION;
 
     static const struct State{
@@ -46,6 +47,11 @@ public:
         const QString connect_fail      = "connect_fail";
         const QString res_request       = "request";
     }TYPE;
+
+    static const struct Updater{
+        const QString update_req = "update_request";
+        const QString files      = "files";
+    }UPDATER;
 
 };
 

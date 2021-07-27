@@ -2,17 +2,11 @@
 #define SERVER_H
 
 #include "json_keys.h"
+#include "autoupdater/autoupdater.h"
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <iostream>
 #include <QtCore>
-
-// Сначала public секции затем private
-// сначала конструктор/деструктор. После этого сначала методы, потом переменные
-
-// приватные методы и переменные в стиле с нижним подчеркиванием
-// публичные методы и переменные в стиле кэмэл
-// если создается указатель на что-то в приватном поле то в начало добавляют m_
 #define READ_BLOCK_SIZE 32768 // 32 кб
 
 class Server: public QObject
@@ -40,31 +34,34 @@ class Server: public QObject
 public:
     Server();
     ~Server() override;
-    //! Установка времени после которого можно перехватить ресурс
+    //! \brief Установка времени после которого можно перехватить ресурс
     void setTimeOut(qint64 secs);
+    //! \brief Установка максимального количества пользователей
     void setMaxUser(quint8 maxUser);
-    //! Установка режима отклонения входящих подключений
+    //! \brief Установка режима отклонения входящих подключений
     void setRejectConnection(bool a);
-    //! Установка режима отклонения запросов ресурсов
+    //! \brief Установка режима отклонения запросов ресурсов
     void setRejectResReq(bool a);
-    //! список доступных ресурсов
+    //! \brief получить список доступных ресурсов
     QStringList getResList();
-    //! список разрешенных пользователей
+    //! \brief получить список разрешенных пользователей
     QStringList getUserList();
+    //! \brief получить текущего пользователя ресурса
     QString getResUser(QString resName);
-    //! время сколько ресурс занят
+    //! \brief получить время сколько ресурс занят
     qint32 getBusyResTime(QString resName);
-    //! время старта сервера
+    //! \brief получить время старта сервера
     const QDateTime& getStartTime() const;
-    //! освобождение всех ресурсов
+    //! \brief освободить все ресурсы
     void allResClear();
-    //! добовления нового ресурса
+    //! \brief добовить новый ресурс
     void addNewRes(QString resName);
-    //! добовления нового разрешенного пользователя
+    //! \brief добавить нового разрешенного пользователя
+    //! \todo : нормальная система авторизации, а не просто имя
     void addNewUsrName(QString name);
-    //! удаление ресурса
+    //! \brief удаление ресурса
     void removeRes(QString resName);
-    //! удаления пользователя из списка разрешенных
+    //! \brief удаления пользователя из списка разрешенных
     void removeUsr(QString name);
 
 signals:
@@ -83,12 +80,15 @@ private:
     void send_to_client(QTcpSocket &sock, const QJsonObject &jObj);
     //! широковещательная рассылка всем подключенным клиентам
     void send_to_all_clients();
+    //! обработка json сообщений
     void json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket);
     //! резервирование ресурса за пользователем
     void res_req_take(const QJsonObject &jObj);
     //! освобождение ресурса от пользователя
     void res_req_free(const QJsonObject &jObj);
     void new_client_autorization(QTcpSocket &sock, const QString &newUsrName);
+    //! обработка запроса обновлений. Проверка необходимости и отправка файлов
+    void update_req_handle(const QJsonObject &jObj);
 
 private:
     qint64 maxBusyTime = 7200; // 2 часа
@@ -101,6 +101,8 @@ private:
 
     QMutex mutex;
     QTcpServer m_server;
+
+    AutoUpdater m_updater;
 
     QSharedPointer<QSettings> sett;
     QMap<QString, UserInf>  m_userList;  // FIXME можно без qsharedpointer

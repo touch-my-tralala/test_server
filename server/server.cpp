@@ -293,34 +293,9 @@ void Server::on_slotDisconnected(){
 
 
 void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket){
-    if(!m_blockIp.contains(clientIp)){
-        QString name = jObj[JSON_KEYS::Common().user_name].toString();
-        if(m_userList.contains(name)){ // Если имя клиента есть в списке
-
-            if(!jObj.contains(JSON_KEYS::Action().action)){
-                new_client_autorization(clientSocket, name);
-            }else{
-                if(jObj[JSON_KEYS::Action().action].toString() == JSON_KEYS::Action().take)
-                    res_req_take(jObj);
-                else if(jObj[JSON_KEYS::Action().action].toString() == JSON_KEYS::Action().leave)
-                    res_req_free(jObj);
-                else
-                    emit signalLogEvent("ОШИБКА → res_request не содержит действия " + jObj[JSON_KEYS::Action().action].toString());
-            }
-            // отправка всем пользователям актуальной инфы
-            send_to_all_clients();
-
-        }else{
-            m_blockIp.insert(clientIp);
-            QJsonObject jObj({
-                             {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().connect_fail}
-                             });
-            send_to_client(clientSocket, jObj);
-            clientSocket.abort();
-            emit signalLogEvent("Server → Имя пользователя " + jObj[JSON_KEYS::Common().user_name].toString() + " не является разрешенным");
-        }
-    }else{
-        // Отправка сообщения о том что сосать, а не подключение.
+    // Проверка на бан
+    if(!m_blockIp.contains(clientIp))
+    {
         QJsonObject jObj({
                          {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().connect_fail}
                          });
@@ -328,6 +303,43 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
         clientSocket.disconnectFromHost();
         emit signalLogEvent("Server → IP клиента " + clientIp.toString() + " находися в бан листе до конца сессиий сервера.");
     }
+
+    // Ответ на запрос обновлений
+    // TODO: запрос обновления после подключения пользователя. А не до основных действий
+    if(jObj.contains(JSON_KEYS::Action().update_req))
+    {
+        update_req_handle(jObj);
+        return;
+    }
+
+    QString name = jObj[JSON_KEYS::Common().user_name].toString();
+    // Проверка разрешения имени
+    if(!m_userList.contains(name))
+    {
+        m_blockIp.insert(clientIp);
+        QJsonObject jObj({
+                         {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().connect_fail}
+                         });
+        send_to_client(clientSocket, jObj);
+        clientSocket.abort();
+        emit signalLogEvent("Server → Имя пользователя " + jObj[JSON_KEYS::Common().user_name].toString() + " не является разрешенным");
+    }
+
+    // Первое подключение
+    if(!jObj.contains(JSON_KEYS::Action().action))
+    {
+        new_client_autorization(clientSocket, name);
+        return;
+    }
+
+    // Обработка действий
+    if(jObj[JSON_KEYS::Action().action].toString() == JSON_KEYS::Action().take)
+        res_req_take(jObj);
+    else if(jObj[JSON_KEYS::Action().action].toString() == JSON_KEYS::Action().leave)
+        res_req_free(jObj);
+    else
+        emit signalLogEvent("ОШИБКА → res_request не содержит действия " + jObj[JSON_KEYS::Action().action].toString());
+
 }
 
 
@@ -471,6 +483,19 @@ void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
     }
 }
 
+void Server::update_req_handle(const QJsonObject &jObj){
+    if(!jObj.contains(JSON_KEYS::Updater().files))
+    {
+        emit signalLogEvent("ОШИБКА → Не корректный запрос обновлений.");
+        return;
+    }
+    QJsonObject file_obj = static_cast<QJsonObject>(jObj[JSON_KEYS::Updater().files].toObject());
+    QVariantMap map = static_cast<QVariantMap>(file_obj.toVariantMap());
+    for(auto i = map.begin(), e = map.end(); i != e; i++)
+    {
+        // Проверка что файл есть и сверка версий.
+    }
+}
 
 // Обновление данных о ресурсах/пользователях у всех клиентов. Наверное так делать не совсем верно.
 void Server::send_to_all_clients(){
