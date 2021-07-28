@@ -9,8 +9,8 @@ public:
         const QString server_settings = "SERVER_SETTINGS";
         const QString port            = "port";
         const QString max_user        = "max_user";
-        const QString current_version = "CURRENT_VERSION";
-        const QString version         = "version";
+        const QString updates         = "UPDATES";
+        const QString update_path     = "update_path";
     }CONFIG;
 
     static const struct Common{
@@ -49,8 +49,9 @@ public:
     }TYPE;
 
     static const struct Updater{
-        const QString update_req = "update_request";
-        const QString files      = "files";
+        const QString update_req   = "update_request";
+        const QString file_name    = "file_name";
+        const QString file_version = "version";
     }UPDATER;
 
 };

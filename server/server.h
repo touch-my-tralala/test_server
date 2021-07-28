@@ -88,7 +88,9 @@ private:
     void res_req_free(const QJsonObject &jObj);
     void new_client_autorization(QTcpSocket &sock, const QString &newUsrName);
     //! обработка запроса обновлений. Проверка необходимости и отправка файлов
-    void update_req_handle(const QJsonObject &jObj);
+    void update_req_handle(QTcpSocket &sock, const QJsonObject &jObj);
+    //! чтение списка файлов обновления и их версий
+    void update_info_json();
 
 private:
     qint64 maxBusyTime = 7200; // 2 часа
@@ -97,7 +99,7 @@ private:
     quint16 m_port;
     quint8 m_max_users;
     bool reject_res_req = false;
-    QString m_cur_version;
+    QString m_updates_path;
 
     QMutex mutex;
     QTcpServer m_server;

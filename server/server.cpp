@@ -49,8 +49,8 @@ Server::~Server(){
     sett->setValue(JSON_KEYS::Config().max_user, m_max_users);
     sett->endGroup();
 
-    sett->beginGroup(JSON_KEYS::Config().current_version);
-    sett->setValue(JSON_KEYS::Config().version, m_cur_version);
+    sett->beginGroup(JSON_KEYS::Config().updates);
+    sett->setValue(JSON_KEYS::Config().update_path, m_updater.getUpdatesPath());
     sett->endGroup();
 
     if(m_server.isListening()){
@@ -230,10 +230,16 @@ void Server::ini_parse(QString fname){
         }
         sett->endGroup();
 
-        // Получение текущей версии приложения
-        sett->beginGroup(JSON_KEYS::Config().current_version);
-        if(sett->contains(JSON_KEYS::Config().version))
-            m_cur_version = sett->value(JSON_KEYS::Config().version).toString();
+        // Чтение пути к файлам обновлений
+        sett->beginGroup(JSON_KEYS::Config().updates);
+        if(sett->contains(JSON_KEYS::Config().update_path)){
+            auto path = sett->value(JSON_KEYS::Config().update_path).toString();
+            if(m_updater.setUpdateFilePath(path)){
+                m_updates_path = path;
+                update_info_json();
+            }else
+                emit signalLogEvent("ОШИБКА → путь к файлам обновления не найден. Path = " + path);
+        }
         sett->endGroup();
 
    }else{
@@ -241,6 +247,23 @@ void Server::ini_parse(QString fname){
     }
 }
 
+void Server::update_info_json(){
+    QFile file(m_updates_path + "updates.json");
+    file.open(QIODevice::ReadOnly | QIODevice::Text);
+    QString val = file.readAll();
+    file.close();
+
+    QJsonDocument jDoc = QJsonDocument::fromJson(val.toUtf8());
+    QJsonArray jArr = jDoc.object()["files"].toArray();
+
+    QString file_name, version;
+    for(auto i: jArr){
+        auto j = i.toObject();
+        file_name = j[JSON_KEYS::Updater().file_name].toString();
+        version = j[JSON_KEYS::Updater().file_version].toString();
+        m_updater.addUpdateFile({file_name, version});
+    }
+}
 
 void Server::on_slotNewConnection(){
     QTcpSocket* clientSocket = m_server.nextPendingConnection(); // FIXME эту хрень так оставить или надо удалять?
@@ -306,9 +329,9 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
 
     // Ответ на запрос обновлений
     // TODO: запрос обновления после подключения пользователя. А не до основных действий
-    if(jObj.contains(JSON_KEYS::Action().update_req))
+    if(jObj.contains(JSON_KEYS::Updater().update_req))
     {
-        update_req_handle(jObj);
+        update_req_handle(clientSocket, jObj);
         return;
     }
 
@@ -359,7 +382,6 @@ void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName
                      {JSON_KEYS::Common().resnum, resNum},
                      {JSON_KEYS::Common().resuser, resUser},
                      {JSON_KEYS::Common().busy_time, resTime},
-                     {JSON_KEYS::Config().version, m_cur_version}
                      });
     send_to_client(sock, jObj);
 }
@@ -483,18 +505,17 @@ void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
     }
 }
 
-void Server::update_req_handle(const QJsonObject &jObj){
-    if(!jObj.contains(JSON_KEYS::Updater().files))
-    {
-        emit signalLogEvent("ОШИБКА → Не корректный запрос обновлений.");
-        return;
-    }
-    QJsonObject file_obj = static_cast<QJsonObject>(jObj[JSON_KEYS::Updater().files].toObject());
-    QVariantMap map = static_cast<QVariantMap>(file_obj.toVariantMap());
-    for(auto i = map.begin(), e = map.end(); i != e; i++)
-    {
-        // Проверка что файл есть и сверка версий.
-    }
+//FIMXE: это надо сделать через ивент луп наверное
+void Server::update_req_handle(QTcpSocket &sock, const QJsonObject &jObj){
+    auto file_name = jObj[JSON_KEYS::Updater().file_name].toString();
+    auto file_version = jObj[JSON_KEYS::Updater().file_version].toString();
+
+    bool update_avalible = m_updater.sendFile( sock, {file_name, file_version} );
+
+    if(!update_avalible)
+        emit signalLogEvent("ОШИБКА → Передача или открытие файла обновлений провалено.");
+    else
+        emit signalLogEvent("Server → "" Файл обновления " + file_name + " отправлен пользователю + " + sock.peerAddress().toString() );
 }
 
 // Обновление данных о ресурсах/пользователях у всех клиентов. Наверное так делать не совсем верно.

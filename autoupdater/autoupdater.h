@@ -26,6 +26,8 @@ public:
     //! \param[file] <имя файла, версия>.
     //! \return true если файл успешно добавлен.
     bool addUpdateFile(const QPair<QString, QString> &file);
+    //! \brief Удаление из списка всех ранее добавленных файлов
+    void removeUpdateFiles(){ m_update_files.clear(); }
     //! \brief Установка пути к директории где лежат файлы обновлений.
     //! \return true если путь существует.
     bool setUpdateFilePath(const QString &path);
@@ -34,16 +36,15 @@ public:
     bool checkFileVersion(const QString &fileName);
     //! \brief Отправка нового файла обновлений.
     //! \param[file] <имя файла, версия>.
-    //! \return true если файл успешно отправлен.
-    bool sendFile(QTcpSocket *sock, const QPair<QString, QString> &file);
-    //! \brief Отправка всех новых файлов обновлений.
-    //! \param[files] QMap<имя файла, версия>.
-    //! \return число отправленных файлов, если возникла ошибка при передаче или
-    //! открытии файла вернет -1;
-    int sendFiles(QTcpSocket *sock, const QMap<QString,  QString> &files);
+    //! \return true файл успешно отправлен, false нет зарегистрированного файла с таким именем или обновление не требуется.
+    bool sendFile(QTcpSocket &sock, const QPair<QString, QVariant> &file);
+    //! \brief Возвращает мапу зарегестрированных файлов
+    //! \return мапу <имя файла, версия>
+    QMap<QString, QString> getFileMap(){ return m_update_files; }
+    QString getUpdatesPath(){ return m_update_file_path; }
 
 private:
-    bool send(QTcpSocket *sock, const QString &fileName);
+    bool send(QTcpSocket &sock, const QString &fileName);
 
 
 private:
