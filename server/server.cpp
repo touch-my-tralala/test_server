@@ -50,7 +50,7 @@ Server::~Server(){
     sett->endGroup();
 
     sett->beginGroup(JSON_KEYS::Config().updates);
-    sett->setValue(JSON_KEYS::Config().update_path, m_updater.getUpdatesPath());
+    sett->setValue(JSON_KEYS::Config().update_path, m_updates_path);
     sett->endGroup();
 
     if(m_server.isListening()){
@@ -234,7 +234,7 @@ void Server::ini_parse(QString fname){
         sett->beginGroup(JSON_KEYS::Config().updates);
         if(sett->contains(JSON_KEYS::Config().update_path)){
             auto path = sett->value(JSON_KEYS::Config().update_path).toString();
-            if(m_updater.setUpdateFilePath(path)){
+            if(m_updater.setUpdateFilePath(QDir::currentPath() + path)){
                 m_updates_path = path;
                 update_info_json();
             }else
@@ -248,8 +248,10 @@ void Server::ini_parse(QString fname){
 }
 
 void Server::update_info_json(){
-    QFile file(m_updates_path + "updates.json");
+    QFile file(QDir::currentPath() + m_updates_path + "/" + "updates.json");
     file.open(QIODevice::ReadOnly | QIODevice::Text);
+    if(!file.isOpen())
+        return;
     QString val = file.readAll();
     file.close();
 

@@ -51,7 +51,6 @@ private:
     Server server;
     QTimer timer;
     QDateTime work_time;
-    //MyTableViewModel* m_model;
     UserTableViewModel* m_usr_model;
     ResursTableViewModel* m_res_model;
     QMap<QString, ResInf> res_inf;

@@ -5,6 +5,7 @@
 #include <QFileInfo>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QDir>
 
 #define BLOCK_WRITE 32768 //< количество байт для отправки
 
@@ -29,6 +30,7 @@ public:
     //! \brief Удаление из списка всех ранее добавленных файлов
     void removeUpdateFiles(){ m_update_files.clear(); }
     //! \brief Установка пути к директории где лежат файлы обновлений.
+    //! \param[absolut] true - абсолютный путь, false - относительный запуска приложения.
     //! \return true если путь существует.
     bool setUpdateFilePath(const QString &path);
     //! \brief Проверка необходимости обновлений файла.

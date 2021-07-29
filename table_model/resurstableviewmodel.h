@@ -2,7 +2,6 @@
 #define RESURSTABLEVIEWMODEL_H
 
 #include <QAbstractTableModel>
-#include <QCheckBox>
 #include <QDebug>
 
 class ResursTableViewModel : public QAbstractTableModel
