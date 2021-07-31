@@ -1,7 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#include "json_keys.h"
+#include "keys.h"
 #include "autoupdater/autoupdater.h"
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -12,24 +12,6 @@
 class Server: public QObject
 {
     Q_OBJECT
-
-    struct UserInf{
-        UserInf(){}
-        ~UserInf(){}
-
-        QTcpSocket* socket = nullptr;
-        QTime time;
-        quint64 request = 0;
-
-    };
-
-    struct ResInf{
-        ResInf(){}
-        ~ResInf(){}
-
-        QTime time;
-        QString currentUser = JSON_KEYS::State().free;
-    };
 
 public:
     Server();
@@ -72,25 +54,27 @@ private slots:
     void on_slotNewConnection();
     void on_slotReadClient();
     void on_slotDisconnected();
+    //! \brief широковещательная рассылка всем подключенным клиентам
+    void send_to_all_clients();
 
 private:
-    //! парсинг конфигурации из файла
+    //! \brief парсинг конфигурации из файла
     void ini_parse(QString fname);
-    //! отправка одному клиенту
+    //! \brief отправка одному клиенту
     void send_to_client(QTcpSocket &sock, const QJsonObject &jObj);
-    //! широковещательная рассылка всем подключенным клиентам
-    void send_to_all_clients();
-    //! обработка json сообщений
+    //! \brief обработка json сообщений
     void json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket);
-    //! резервирование ресурса за пользователем
+    //! \brief резервирование ресурса за пользователем
     void res_req_take(const QJsonObject &jObj);
-    //! освобождение ресурса от пользователя
+    //! \brief освобождение ресурса от пользователя
     void res_req_free(const QJsonObject &jObj);
     void new_client_autorization(QTcpSocket &sock, const QString &newUsrName);
-    //! обработка запроса обновлений. Проверка необходимости и отправка файлов
+    //! \brief обработка запроса обновлений. Проверка необходимости и отправка файлов
     void update_req_handle(QTcpSocket &sock, const QJsonObject &jObj);
-    //! чтение списка файлов обновления и их версий
+    //! \brief чтение списка файлов обновления и их версий
     void update_info_json();
+    //! \brief запись данных в конфиг файл
+    void write_to_config();
 
 private:
     qint64 maxBusyTime = 7200; // 2 часа
@@ -100,15 +84,12 @@ private:
     quint8 m_max_users;
     bool reject_res_req = false;
     QString m_updates_path;
-
     QMutex mutex;
     QTcpServer m_server;
-
     AutoUpdater m_updater;
-
-    QSharedPointer<QSettings> sett;
-    QMap<QString, UserInf>  m_userList;  // FIXME можно без qsharedpointer
-    QMap<QString, ResInf>  m_resList;    // имя ресурса - текущий пользователь
+    QSettings* sett; // FIXME: не очень понял в чем дело, но если сделать не как указатель и потом указать setPath(QSettings::IniFormat, QSettings::UserScope, path) то файл не читается.
+    QMap<QString, QPair<QTcpSocket*, QTime>>  m_userList;  // FIXME можно без qsharedpointer
+    QMap<QString, QPair<QString, QTime>>  m_resList;    // <имя ресурса, <пользователь, время>>
     QMap<QString, QJsonArray> m_grabRes; // имя пользователя - лист ресурсов, которые у него забрали
     QSet<QHostAddress>  m_blockIp;
     QDateTime startServTime;

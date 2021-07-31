@@ -9,15 +9,14 @@ Server::Server()
     Server::ini_parse("init.ini");
 
     emit signalLogEvent("Server → Максимальное количество пользователей - " + QString::number(m_max_users) + ".");
-
     m_server.setMaxPendingConnections(m_max_users);
 
     if(!m_server.listen(QHostAddress::Any, m_port)){
         emit signalLogEvent("ОШИБКА → Прослушивание порта невозможно.");
         return;
-    }else{
+    }else
         emit signalLogEvent("Server → порт - " + QString::number(m_port) + ".");
-    }
+
     connect(&m_server, &QTcpServer::newConnection,
             this, &Server::on_slotNewConnection);
 
@@ -25,37 +24,12 @@ Server::Server()
     emit signalLogEvent("Server → Время старта: " + startServTime.toString("hh:mm:ss."));
 }
 
-Server::~Server(){
-    quint16 j = 0;
+Server::~Server()
+{
+    write_to_config();
 
-    sett->clear();
-    sett->beginGroup(JSON_KEYS::Common().resource_list);
-    for(auto i = m_resList.begin(), end = m_resList.end(); i != end; i++){
-        sett->setValue("res" + QString::number(j), i.key());
-        j++;
-    }
-    sett->endGroup();
-
-    j = 0;
-    sett->beginGroup(JSON_KEYS::Common().user_list);
-    for(auto i =m_userList.begin(), end = m_userList.end(); i != end; i++){
-        sett->setValue("usr" + QString::number(j), i.key());
-        j++;
-    }    
-    sett->endGroup();
-
-    sett->beginGroup(JSON_KEYS::Config().server_settings);
-    sett->setValue(JSON_KEYS::Config().port, m_port);
-    sett->setValue(JSON_KEYS::Config().max_user, m_max_users);
-    sett->endGroup();
-
-    sett->beginGroup(JSON_KEYS::Config().updates);
-    sett->setValue(JSON_KEYS::Config().update_path, m_updates_path);
-    sett->endGroup();
-
-    if(m_server.isListening()){
+    if(m_server.isListening())
         m_server.close();
-    }
 }
 
 void Server::setTimeOut(qint64 secs){
@@ -64,7 +38,7 @@ void Server::setTimeOut(qint64 secs){
 }
 
 void Server::setMaxUser(quint8 maxUsers){
-    this->m_max_users = maxUsers;
+    m_max_users = maxUsers;
     emit signalLogEvent("Server → Макс. количество пользователей "
                         + QString::number(maxUsers) + " успешно установлено.");
 }
@@ -90,37 +64,37 @@ QStringList Server::getResList(){
     QStringList resList;
     for(auto i = m_resList.begin(); i != m_resList.end(); i++)
         resList << i.key();
+
     return resList;
 }
 
 QStringList Server::getUserList(){
     QStringList usrList;
-    for(auto i = m_userList.begin(); i != m_userList.end(); i++){
+    for(auto i = m_userList.begin(); i != m_userList.end(); i++)
         usrList << i.key();
-    }
+
     return usrList;
 }
 
 QString Server::getResUser(QString resName){
     if(m_resList.contains(resName))
-        return m_resList[resName].currentUser;
-    else{
-        emit signalLogEvent("ОШИБКА → Пользователя с таким именем нет в списке getResUSer().");
-        return "";
-    }
+        return m_resList[resName].first;
+
+    emit signalLogEvent("ОШИБКА → Пользователя с таким именем нет в списке getResUSer().");
+    return "";
 }
 
 // возвращает время в секундах прошедшее с момента занятия ресурса
 qint32 Server::getBusyResTime(QString resName){
     if(m_resList.contains(resName)){
-        if(m_resList[resName].currentUser == JSON_KEYS::State().free)
+        if(m_resList[resName].first == KEYS::Common().no_user)
             return 0;
         else
-            return m_resList[resName].time.secsTo(QTime::currentTime());
-    }else{
-        emit signalLogEvent("ОШИБКА → Ресурса с таким именем нет в списке getBusyResTime().");
-        return -1;
+            return m_resList[resName].second.secsTo(QTime::currentTime());
     }
+    emit signalLogEvent("ОШИБКА → Ресурса с таким именем нет в списке getBusyResTime().");
+    return -1;
+
 }
 
 const QDateTime& Server::getStartTime() const{
@@ -131,109 +105,85 @@ void Server::allResClear(){
     QJsonObject jObj;
     QString usrName;
     for(auto i = m_resList.begin(); i != m_resList.end(); i++){
-        if(i.value().currentUser != JSON_KEYS::State().free){
-            usrName = i.value().currentUser;
-            // FIXME проверить будет ли работать.
-            m_grabRes[usrName].push_back(i.key());
-            i.value().currentUser = JSON_KEYS::State().free;
-            i.value().time.setHMS(0, 0, 0);
+        if(i->first != KEYS::Common().no_user){
+            i->first = KEYS::Common().no_user;
+            i->second.setHMS(0, 0, 0);
         }
     }
-    QJsonObject oldUserObj({
-                           {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().grab_res}
-                           });
-    for(auto i = m_grabRes.begin(); i != m_grabRes.end(); ++i){        
-        oldUserObj.insert(JSON_KEYS::Common().resource, i.value());
-        send_to_client(*m_userList[i.key()].socket, oldUserObj);
-    }
-    m_grabRes.clear();
+    send_to_all_clients();
     emit signalLogEvent("Server → Очистка всех ресурсов.");
 }
 
 void Server::addNewRes(QString resName){
     if(!m_resList.contains(resName)){
-        m_resList.insert(resName, ResInf());
+        m_resList.insert(resName, {KEYS::Common().no_user, QTime(0,0,0)});
+        send_to_all_clients();
         emit signalLogEvent("Server → Ресурс " + resName + " успешно добавлен.");
-    }else{
+    }else
         emit signalLogEvent("ОШИБКА → Ресурс " + resName + "уже есть в списке.");
-    }
 }
 
 void Server::addNewUsrName(QString name){
     if(!m_userList.contains(name)){
-        m_userList.insert(name, UserInf());
+        m_userList.insert(name, {nullptr, QTime(0,0,0)});
         emit signalLogEvent("Server → Пользователь " + name + " успешно добавлен.");
-    }else{
+    }else
         emit signalLogEvent("ОШИБКА → Пользователь " + name + " уже есть в списке.");
-    }
 }
 
 void Server::removeRes(QString resName){
     if(m_resList.contains(resName)){
         m_resList.remove(resName);
+        send_to_all_clients();
         emit signalLogEvent("Server → Ресурс " + resName + " успешно удален.");
-    }else{
+    }else
         emit signalLogEvent("ОШИБКА → Ресурса "+ resName + " нет в списке удален.");
-    }
 }
 
 void Server::removeUsr(QString name){
     if(m_userList.contains(name)){
         m_userList.remove(name);
         emit signalLogEvent("Server → Пользователь " + name + " успешно удален.");
-    }else{
+    }else
         emit signalLogEvent("ОШИБКА → Пользователя " + name + " нет в списке.");
-    }
 }
 
 
 void Server::ini_parse(QString fname){
-    sett = QSharedPointer<QSettings>(new QSettings(QDir::currentPath() + "/" + fname, QSettings::IniFormat));
+    sett = new QSettings(QDir::currentPath() + "/" + fname, QSettings::IniFormat);
     if(sett->isWritable()){
         sett->setIniCodec("UTF-8");
 
         // Инициализация настроек сервера
-
-        sett->beginGroup(JSON_KEYS::Config().server_settings);
-        if(sett->contains(JSON_KEYS::Config().port)){
-            m_port = static_cast<quint16>(sett->value(JSON_KEYS::Config().port, 9292).toUInt());
-        }else{
-            m_port = 9292;
-            sett->setValue(JSON_KEYS::Config().port, 9292);
-        }
-
-        if(sett->contains(JSON_KEYS::Config().max_user)){
-            m_max_users = static_cast<quint8>(sett->value(JSON_KEYS::Config().max_user, 5).toUInt());
-        }else{
-            m_max_users = 5;
-            sett->setValue(JSON_KEYS::Config().max_user, 5);
-        }
+        sett->beginGroup(KEYS::Config().server_settings);
+        m_port = static_cast<quint16>(sett->value(KEYS::Config().port, 9292).toUInt());
+        m_max_users = static_cast<quint8>(sett->value(KEYS::Config().max_user, 5).toUInt());
         sett->endGroup();
 
         // Инициализация списка разрешенных пользователей
         QStringList iniList;
 
-        sett->beginGroup(JSON_KEYS::Common().user_list);
+        sett->beginGroup(KEYS::Config().user_list);
         iniList = sett->childKeys();
         for (auto i : iniList){
-            auto name = sett->value(i, "no_data").toString().toLower();
-            m_userList.insert(name, UserInf());
+            auto name = sett->value(i, "no_data").toString();
+            m_userList.insert(name, {nullptr, QTime(0,0,0)});
         }
         sett->endGroup();
 
         // Инициализация списка ресурсов
-        sett->beginGroup(JSON_KEYS::Common().resource_list);
+        sett->beginGroup(KEYS::Config().resource_list);
         iniList = sett->childKeys();
         for(auto i: iniList){
             auto name = sett->value(i, "no_data").toString().toLower();
-            m_resList.insert(name, ResInf());
+            m_resList.insert(name, {KEYS::Common().no_user, QTime(0,0,0)});
         }
         sett->endGroup();
 
         // Чтение пути к файлам обновлений
-        sett->beginGroup(JSON_KEYS::Config().updates);
-        if(sett->contains(JSON_KEYS::Config().update_path)){
-            auto path = sett->value(JSON_KEYS::Config().update_path).toString();
+        sett->beginGroup(KEYS::Config().updates);
+        if(sett->contains(KEYS::Config().update_path)){
+            auto path = sett->value(KEYS::Config().update_path).toString();
             if(m_updater.setUpdateFilePath(QDir::currentPath() + path)){
                 m_updates_path = path;
                 update_info_json();
@@ -244,7 +194,7 @@ void Server::ini_parse(QString fname){
 
    }else{
         emit signalLogEvent("ОШИБКА → ini файл в режиме read-only.");
-    }
+   }
 }
 
 void Server::update_info_json(){
@@ -261,8 +211,8 @@ void Server::update_info_json(){
     QString file_name, version;
     for(auto i: jArr){
         auto j = i.toObject();
-        file_name = j[JSON_KEYS::Updater().file_name].toString();
-        version = j[JSON_KEYS::Updater().file_version].toString();
+        file_name = j[KEYS::Updater().file_name].toString();
+        version = j[KEYS::Updater().file_version].toString();
         m_updater.addUpdateFile({file_name, version});
     }
 }
@@ -270,8 +220,6 @@ void Server::update_info_json(){
 void Server::on_slotNewConnection(){
     QTcpSocket* clientSocket = m_server.nextPendingConnection(); // FIXME эту хрень так оставить или надо удалять?
 
-    emit signalLogEvent("Server → Новое подключение: Addres - " + clientSocket->peerAddress().toString() +
-                        " Port - " + QString::number(clientSocket->peerPort()));
     connect(clientSocket, &QTcpSocket::disconnected,
             this, &Server::on_slotDisconnected);
     connect(clientSocket, &QTcpSocket::readyRead,
@@ -285,7 +233,7 @@ void Server::on_slotReadClient(){
     if(curByteNum <= READ_BLOCK_SIZE){
         buff.append(clientSocket->read(curByteNum));
     }else{
-        for(int i=0; i<=curByteNum/READ_BLOCK_SIZE; i=i+READ_BLOCK_SIZE){
+        for(int i=0; i<=curByteNum/READ_BLOCK_SIZE; i=i+READ_BLOCK_SIZE){ // FIXME:: так работать не будет
             buff.append( clientSocket->read(READ_BLOCK_SIZE) );
         }
     }
@@ -309,9 +257,6 @@ void Server::on_slotReadClient(){
 
 void Server::on_slotDisconnected(){
     QTcpSocket* clientSocket = qobject_cast<QTcpSocket*>(sender());
-    emit signalLogEvent("Server → Клиент: Addres - " + clientSocket->peerAddress().toString() +
-                        " Port - " + QString::number(clientSocket->peerPort()) + " отключился.");
-    // FIXME возможно надо проверять теперь на валидность / подключенность сокета
     clientSocket->abort();
     clientSocket->deleteLater();
 }
@@ -319,10 +264,10 @@ void Server::on_slotDisconnected(){
 
 void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket){
     // Проверка на бан
-    if(!m_blockIp.contains(clientIp))
+    if(m_blockIp.contains(clientIp))
     {
         QJsonObject jObj({
-                         {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().connect_fail}
+                         {KEYS::Json().type, KEYS::Json().connect_fail}
                          });
         send_to_client(clientSocket, jObj);
         clientSocket.disconnectFromHost();
@@ -331,170 +276,158 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
 
     // Ответ на запрос обновлений
     // TODO: запрос обновления после подключения пользователя. А не до основных действий
-    if(jObj.contains(JSON_KEYS::Updater().update_req))
+    if(jObj.contains(KEYS::Updater().update_req))
     {
         update_req_handle(clientSocket, jObj);
         return;
     }
 
-    QString name = jObj[JSON_KEYS::Common().user_name].toString();
+    QString name = jObj[KEYS::Json().user_name].toString();
     // Проверка разрешения имени
     if(!m_userList.contains(name))
     {
         m_blockIp.insert(clientIp);
         QJsonObject jObj({
-                         {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().connect_fail}
+                         {KEYS::Json().type, KEYS::Json().connect_fail}
                          });
         send_to_client(clientSocket, jObj);
         clientSocket.abort();
-        emit signalLogEvent("Server → Имя пользователя " + jObj[JSON_KEYS::Common().user_name].toString() + " не является разрешенным");
+        emit signalLogEvent("Server → Имя пользователя " + jObj[KEYS::Json().user_name].toString() + " не является разрешенным");
+        return;
     }
 
     // Первое подключение
-    if(!jObj.contains(JSON_KEYS::Action().action))
+    if(!jObj.contains(KEYS::Json().action))
     {
         new_client_autorization(clientSocket, name);
         return;
     }
 
     // Обработка действий
-    if(jObj[JSON_KEYS::Action().action].toString() == JSON_KEYS::Action().take)
+    if(jObj[KEYS::Json().action].toString() == KEYS::Json().take)
         res_req_take(jObj);
-    else if(jObj[JSON_KEYS::Action().action].toString() == JSON_KEYS::Action().leave)
+    else if(jObj[KEYS::Json().action].toString() == KEYS::Json().drop)
         res_req_free(jObj);
-    else
-        emit signalLogEvent("ОШИБКА → res_request не содержит действия " + jObj[JSON_KEYS::Action().action].toString());
 
+    // костыль, чтобы json строки не отправлялись одна за другой. Подробнее смотри в слоте.
+    QTimer::singleShot(100, this, &Server::send_to_all_clients);
 }
 
-
-// Первое подключение пользователя. Ему отправляется время старта сервера и список ресурсов и кто их занимает и время.
+// Первое подключение пользователя.
 void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName){
-    m_userList[newUsrName].socket = &sock; // FIXME здесь норм &??
+    m_userList[newUsrName].first = &sock;
 
-    //QJsonObject jObj;
-    QJsonArray resNum, resUser, resTime;
+    QJsonArray resources;
     for(auto i = m_resList.begin(); i != m_resList.end(); i++){
-        resNum.push_back(i.key());
-        resUser.push_back(i.value().currentUser);
-        resTime.push_back(i.value().time.toString("hh:mm:ss"));
+        resources.push_back(QJsonObject({{KEYS::Json().res_name, i.key()},
+                                   {KEYS::Json().user_name, i->first},
+                                   {KEYS::Json().time, i->second.second()}
+                                  }));
     }
-    QJsonObject jObj({
-                     {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().authorization},
-                     {JSON_KEYS::Common().resnum, resNum},
-                     {JSON_KEYS::Common().resuser, resUser},
-                     {JSON_KEYS::Common().busy_time, resTime},
+    QJsonObject jObj({{KEYS::Json().type, KEYS::Json().authorization},
+                      {KEYS::Json().resources, resources}
                      });
     send_to_client(sock, jObj);
 }
 
 
 // Запрос ресурсов
-void Server::res_req_take(const QJsonObject &jObj){
-    QJsonArray resNumReq;   // номер запрашиваемого ресурса
-    QJsonArray resStatus;   // ответ на запрашиваемый ресурс
-    QJsonArray resList;     // индекс ресурса (все, не только запрашиваемые)
-    QJsonArray resUser;     // текущий владелец ресурса
-    QJsonArray resTime;     // время, которое текущий пользователь занимает ресурс
-    qint32 usrTime = static_cast<qint32>(jObj[JSON_KEYS::Common().time].toInt());
-    qint32 reqRes = static_cast<qint32>(jObj[JSON_KEYS::ReqType().res_request].toInt());
-    qint32 curRes = 0;
-    QString usrName = jObj[JSON_KEYS::Common().user_name].toString();
-    quint8 idx = 0;
-    for(auto i = m_resList.begin(); i != m_resList.end(); i++){
-        curRes = (reqRes >> (idx*8)) & 0xFF;
-        idx++;
-        if(curRes){
-            qint64 diffTime = i.value().time.secsTo(QTime::currentTime());
-            // Если ресурс свободен
-            if(i.value().currentUser == JSON_KEYS::State().free && !reject_res_req){
-                i.value().currentUser = usrName;
-                i.value().time = QTime(0, 0, 0).addSecs(usrTime);
-                resNumReq.push_back(i.key());
-                resStatus.push_back(1);
-            // ресурс занят, но по таймауту можно перехватить
-            }else if(diffTime > maxBusyTime && !reject_res_req){
-                QString old_user = i.value().currentUser;
-                i.value().currentUser = usrName;
-                i.value().time = QTime(0, 0, 0).addSecs(usrTime);
-                resNumReq.push_back(i.key());
-                resStatus.push_back(1);
+void Server::res_req_take(const QJsonObject &jObj)
+{
+    if(reject_res_req)
+        return;
 
-                // Составление списка пользователей у которых забрали ресурсы.
-                if(m_grabRes.contains(old_user)){
-                    m_grabRes[old_user].push_back(i.key());
-                }else{
-                    m_grabRes.insert(old_user, QJsonArray());
-                    m_grabRes[old_user].push_back(i.key());
+    QMap<QString, QJsonArray> grab_res;
+    QJsonArray arr;
+    QString res_name, past_usr;
+    qint64 diffTime = 0;
+
+    auto usr_name = jObj[KEYS::Json().user_name].toString();
+    int secs = jObj[KEYS::Json().time].toInt();
+    auto res_arr = jObj[KEYS::Json().resources].toArray();
+
+    for(auto i : res_arr){
+        res_name = i.toString();
+
+        if(m_resList[res_name].first != KEYS::Common().no_user)
+            diffTime = m_resList[res_name].second.secsTo(QTime::currentTime());
+
+        if(m_resList[res_name].first == KEYS::Common().no_user || diffTime > maxBusyTime){
+            past_usr = m_resList[res_name].first;
+
+            if(past_usr == usr_name)
+                continue;
+
+            m_resList[res_name].first = usr_name;
+            m_resList[res_name].second = QTime(0,0,0).addSecs(secs);
+            arr.push_back(QJsonObject({{KEYS::Json().res_name, res_name},
+                                       {KEYS::Json().status, true}
+                                      }));
+
+            // Составление списка пользователей у которых забрали ресурсы.
+            if(diffTime > maxBusyTime && past_usr != KEYS::Common().no_user){
+                if(grab_res.contains(past_usr))
+                    grab_res[past_usr].push_back(res_name);
+                else{
+                    grab_res.insert(past_usr, QJsonArray());
+                    grab_res[past_usr].push_back(res_name);
                 }
-            // ресурс занят
-            }else{
-                resNumReq.push_back(i.key());
-                resStatus.push_back(0);
             }
+        }else{
+            arr.push_back(QJsonObject({{KEYS::Json().res_name, res_name},
+                                       {KEYS::Json().status, false}
+                                      }));
         }
-        resList.push_back(i.key());
-        resUser.push_back(i.value().currentUser);
-        resTime.push_back(i.value().time.toString("hh:mm:ss"));
     }
 
     // Отправка всем пользователям у которых забрали ресурс список какие ресурсы у них забрали.
-    QJsonObject oldUserObj;
-    oldUserObj.insert(JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().grab_res);
-    for(auto i = m_grabRes.begin(); i != m_grabRes.end(); ++i){
-        oldUserObj.insert(JSON_KEYS::Common().resource, *i);
-        send_to_client(*m_userList[i.key()].socket, oldUserObj); // эта хуйня сломается наверное при отправке send_all_client
+    for(auto i = grab_res.begin(), e = grab_res.end(); i != e; i++){
+        QJsonObject jobj({{KEYS::Json().type, KEYS::Json().grab_res},
+                          {KEYS::Json().resources, i.value()}
+                         });
+        send_to_client(*m_userList[i.key()].first, jobj);
     }
-    m_grabRes.clear();
 
-    QJsonObject servNotice({
-                               {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().request_responce},
-                               {JSON_KEYS::Action().action, JSON_KEYS::Action().take},
-                               {JSON_KEYS::ReqType().resource_responce, resNumReq},
-                               {JSON_KEYS::Common().status, resStatus}
-                           });
-    send_to_client(*m_userList[usrName].socket, servNotice);
+
+    QJsonObject obj({{KEYS::Json().type, KEYS::Json().request_responce},
+                     {KEYS::Json().action, KEYS::Json().take},
+                     {KEYS::Json().resources, arr}
+                    });
+    send_to_client(*m_userList[usr_name].first, obj);
 }
 
 
 // Освобождение ресурсов
 void Server::res_req_free(const QJsonObject &jObj){
-    QJsonArray resNumReq;   // номер запрашиваемого ресурса
-    QJsonArray resStatus;   // ответ на запрашиваемый ресурс
-    QJsonArray resList;     // индекс ресурса (все, не только запрашиваемые)
-    QJsonArray resUser;     // текущий владелец ресурса
-    QJsonArray resTime;     // время, которое текущий пользователь занимает ресурс
-    qint64 reqRes = static_cast<qint64>(jObj[JSON_KEYS::ReqType().res_request].toInt());
-    qint64 curRes = 0;
-    QString usrName = jObj[JSON_KEYS::Common().user_name].toString();
-    quint8 idx=0;
-    for(auto i = m_resList.begin(); i != m_resList.end(); i++){
-        curRes = (reqRes >> (idx*8)) & 0xFF;
-        idx++;
-        if(curRes && i.value().currentUser == usrName){
-            i.value().currentUser = JSON_KEYS::State().free;
-            i.value().time.setHMS(0, 0, 0);
-            resNumReq.push_back(i.key());
-            resStatus.push_back(1);
-        }else if(curRes){
-            resNumReq.push_back(i.key());
-            resStatus.push_back(0);
+
+    QMap<QString, QJsonArray> grab_res;
+    QJsonArray arr;
+    QString res_name, past_usr;
+
+    auto usr_name = jObj[KEYS::Json().user_name].toString();
+    auto res_arr = jObj[KEYS::Json().resources].toArray();
+
+    for(auto i : res_arr){
+        res_name = i.toString();
+
+        if(m_resList[res_name].first == usr_name){
+            m_resList[res_name].first = KEYS::Common().no_user;
+            m_resList[res_name].second.setHMS(0, 0, 0);
+            arr.push_back(QJsonObject({{KEYS::Json().res_name, res_name},
+                                       {KEYS::Json().status, true}
+                                      }));
+        }else{
+            arr.push_back(QJsonObject({{KEYS::Json().res_name, res_name},
+                                       {KEYS::Json().status, false}
+                                      }));
         }
-        resList.push_back(i.key());
-        resUser.push_back(i.value().currentUser);
-        resTime.push_back(i.value().time.toString("hh:mm:ss"));
     }
 
-    QJsonObject servNotice({
-                               {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().request_responce},
-                               {JSON_KEYS::Action().action, JSON_KEYS::Action().leave},
-                               {JSON_KEYS::ReqType().resource_responce, resNumReq},
-                               {JSON_KEYS::Common().status, resStatus},
-                               {JSON_KEYS::Common().resnum, resList},
-                               {JSON_KEYS::Common().resuser, resUser},
-                               {JSON_KEYS::Common().busy_time, resTime}
-                           });
-    send_to_client(*m_userList[usrName].socket, servNotice);
+    QJsonObject obj({{KEYS::Json().type, KEYS::Json().request_responce},
+                     {KEYS::Json().action, KEYS::Json().drop},
+                     {KEYS::Json().resources, arr}
+                     });
+    send_to_client(*m_userList[usr_name].first, obj);
 }
 
 
@@ -509,8 +442,8 @@ void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
 
 //FIMXE: это надо сделать через ивент луп наверное
 void Server::update_req_handle(QTcpSocket &sock, const QJsonObject &jObj){
-    auto file_name = jObj[JSON_KEYS::Updater().file_name].toString();
-    auto file_version = jObj[JSON_KEYS::Updater().file_version].toString();
+    auto file_name = jObj[KEYS::Updater().file_name].toString();
+    auto file_version = jObj[KEYS::Updater().file_version].toString();
 
     bool update_avalible = m_updater.sendFile( sock, {file_name, file_version} );
 
@@ -522,24 +455,60 @@ void Server::update_req_handle(QTcpSocket &sock, const QJsonObject &jObj){
 
 // Обновление данных о ресурсах/пользователях у всех клиентов. Наверное так делать не совсем верно.
 void Server::send_to_all_clients(){
-    QJsonArray resList, resUser, resTime;
+    // FIXME: мне кажется это не правильно. Но я не нашел более простого варианта, чтобы не засирать
+    // сеть запросами через интервалы времени или не городить костыли по собиранию
+    // json строки из недошедших байт на стороне клиента
+    // еще один вариант заснуть, но мне кажется это еще более не правильным.
+    // сейчас вызывается singleShot таймер на 100 мс.
+
+    QJsonArray resources;
+
     for(auto i = m_resList.begin(); i != m_resList.end(); i++){
-        resList.push_back(i.key());
-        resUser.push_back(i.value().currentUser);
-        resTime.push_back(i.value().time.toString("hh:mm:ss"));
+        resources.push_back(QJsonObject({{KEYS::Json().res_name, i.key()},
+                                         {KEYS::Json().user_name, i->first},
+                                         {KEYS::Json().time, i->second.second()}
+                                         }));
     }
-    QJsonObject jObj({
-                     {JSON_KEYS::ReqType().type, JSON_KEYS::ReqType().broadcast},
-                     {JSON_KEYS::Common().resnum, resList},
-                     {JSON_KEYS::Common().resuser, resUser},
-                     {JSON_KEYS::Common().busy_time, resTime}
+
+    QJsonObject jObj({{KEYS::Json().type, KEYS::Json().broadcast},
+                      {KEYS::Json().resources, resources}
                      });
+
     QJsonDocument jsonDoc(jObj);
     for(auto i = m_userList.begin(); i != m_userList.end(); ++i){
-        if(i.value().socket && i.value().socket->state() == QTcpSocket::ConnectedState ){
-            i.value().socket->write(jsonDoc.toJson(QJsonDocument::Compact));
-        }
+        if(i->first && i->first->state() == QTcpSocket::ConnectedState )
+            i->first->write(jsonDoc.toJson(QJsonDocument::Compact));
     }
+}
+
+void Server::write_to_config()
+{
+    quint32 j = 0;
+
+    sett->clear();
+    sett->beginGroup(KEYS::Config().resource_list);
+    for(auto i = m_resList.begin(), end = m_resList.end(); i != end; i++){
+        sett->setValue("res" + QString::number(j), i.key());
+        j++;
+    }
+    sett->endGroup();
+
+    j = 0;
+    sett->beginGroup(KEYS::Config().user_list);
+    for(auto i =m_userList.begin(), end = m_userList.end(); i != end; i++){
+        sett->setValue("usr" + QString::number(j), i.key());
+        j++;
+    }
+    sett->endGroup();
+
+    sett->beginGroup(KEYS::Config().server_settings);
+    sett->setValue(KEYS::Config().port, m_port);
+    sett->setValue(KEYS::Config().max_user, m_max_users);
+    sett->endGroup();
+
+    sett->beginGroup(KEYS::Config().updates);
+    sett->setValue(KEYS::Config().update_path, m_updates_path);
+    sett->endGroup();
 }
 
 

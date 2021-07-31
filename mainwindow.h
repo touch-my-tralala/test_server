@@ -4,9 +4,8 @@
 #include <QMainWindow>
 #include <QStandardItemModel>
 #include <QSizePolicy>
-//#include <QtCore>
 
-#include "server/json_keys.h"
+#include "server/keys.h"
 #include "server/server.h"
 #include "table_model/resurstableviewmodel.h"
 #include "table_model/usertableviewmodel.h"
@@ -38,9 +37,7 @@ private slots:
     void on_clearAllBtn_clicked();
     void on_timeoutBtn_clicked();
     void on_tabWidget_currentChanged(int index);
-
     void on_pushButtonAdd_clicked();
-
     void on_pushButtonRemove_clicked();
 
 private:

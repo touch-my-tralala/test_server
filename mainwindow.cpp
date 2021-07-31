@@ -8,7 +8,7 @@ MainWindow::MainWindow(QWidget* parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    setWindowTitle("BPOS trecker");
+    setWindowTitle("BPOS tracker server");
     timer.setInterval(1000);
     connect(&timer, &QTimer::timeout, this, &MainWindow::time_out);
 

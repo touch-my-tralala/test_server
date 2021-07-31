@@ -31,7 +31,7 @@ HEADERS += \
     autoupdater/autoupdater.h \
     logger/loggerwidget.h \
     mainwindow.h \
-    server/json_keys.h \
+    server/keys.h \
     server/server.h \
     table_model/resurstableviewmodel.h \
     table_model/usertableviewmodel.h
