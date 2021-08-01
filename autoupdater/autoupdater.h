@@ -11,14 +11,6 @@
 
 class AutoUpdater
 {
-
-struct UpdateKeys{
-    const QString update_file_name = "update.ini";
-    const QString files = "FILES";
-    const QString file_path = "file_path"; //< путь файла, где он лежит у клиента
-    const QString version = "version";
-};
-
 public:
     AutoUpdater();
     ~AutoUpdater();
@@ -41,8 +33,9 @@ public:
     //! \return true файл успешно отправлен, false нет зарегистрированного файла с таким именем или обновление не требуется.
     bool sendFile(QTcpSocket &sock, const QPair<QString, QVariant> &file);
     //! \brief Возвращает мапу зарегестрированных файлов
-    //! \return мапу <имя файла, версия>
+    //! \return <имя файла, версия>
     QMap<QString, QString> getFileMap(){ return m_update_files; }
+    //! \brief Возвращает путь, где сейчас ищуться файлы обновлений
     QString getUpdatesPath(){ return m_update_file_path; }
 
 private:
