@@ -13,7 +13,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(&timer, &QTimer::timeout, this, &MainWindow::time_out);
 
     QStringList resList = server.getResList();
-    ui->tableViewRes->setModel(m_res_model = new ResursTableViewModel);
+    ui->tableViewRes->setModel(m_res_model = new ResursTableViewModel(this));
     for (auto& i : resList)
         m_res_model->appendRes(i);
 
@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget* parent)
     ui->tableViewRes->setFocusPolicy(Qt::NoFocus);
 
     QStringList usrList = server.getUserList();
-    ui->tableViewUsr->setModel(m_usr_model = new UserTableViewModel);
+    ui->tableViewUsr->setModel(m_usr_model = new UserTableViewModel(this));
     for (auto& i : usrList)
         m_usr_model->appendUser(i);
 

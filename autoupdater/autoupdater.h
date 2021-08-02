@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QDir>
+#include <QDataStream>
 
 #define BLOCK_WRITE 32768 //< количество байт для отправки
 
@@ -28,10 +29,11 @@ public:
     //! \brief Проверка необходимости обновлений файла.
     //! \return true если версии не совпадают.
     bool checkFileVersion(const QString &fileName);
-    //! \brief Отправка нового файла обновлений.
+    //! \brief Проверка обновления и отправка нового файла при необходимости. Имеет заголовок 4 байта - размер файла, кастомный заголовок(при необходимости).
     //! \param[file] <имя файла, версия>.
+    //! \param[header] кастомный заголовок, который необходимо добавить.
     //! \return true файл успешно отправлен, false нет зарегистрированного файла с таким именем или обновление не требуется.
-    bool sendFile(QTcpSocket &sock, const QPair<QString, QVariant> &file);
+    bool checkAndSendFile(QTcpSocket &sock, const QPair<QString, QVariant> &file, const QByteArray& header);
     //! \brief Возвращает мапу зарегестрированных файлов
     //! \return <имя файла, версия>
     QMap<QString, QString> getFileMap(){ return m_update_files; }
@@ -39,7 +41,7 @@ public:
     QString getUpdatesPath(){ return m_update_file_path; }
 
 private:
-    bool send(QTcpSocket &sock, const QString &fileName);
+    bool send(QTcpSocket &sock, const QString &fileName, const QByteArray& header);
 
 
 private:

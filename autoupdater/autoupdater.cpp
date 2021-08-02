@@ -27,31 +27,46 @@ bool AutoUpdater::addUpdateFile(const QPair<QString, QString> &file){
     return true;
 }
 
-bool AutoUpdater::sendFile(QTcpSocket &sock, const QPair<QString, QVariant> &file){
+bool AutoUpdater::checkAndSendFile(QTcpSocket &sock, const QPair<QString, QVariant> &file, const QByteArray &header){
     auto file_name = file.first;
     auto file_version = static_cast<QString>(file.second.toString());
     if(m_update_files.contains(file_name) && m_update_files[file_name] != file_version){
-        send(sock, file_name);
+        send(sock, file_name, header);
         return true;
     }
 
     return false;
 }
 
-bool AutoUpdater::send(QTcpSocket &sock, const QString &fileName){
+bool AutoUpdater::send(QTcpSocket &sock, const QString &fileName, const QByteArray &header){
     if(sock.state() != QTcpSocket::ConnectedState)
         return false;
 
     QFile file(m_update_file_path + "/" + fileName);
     if(file.open(QIODevice::ReadOnly))
     {
-        QByteArray file_arr = file.readAll();
-        auto byte_num = file_arr.size();
-        sock.write(QJsonDocument({{fileName, byte_num}}).toJson(QJsonDocument::Compact));
+        bool firs_pack = true;
+        QByteArray block;
+        QDataStream fileStream(&file);
+        char *read_block = new char[BLOCK_WRITE];
 
-        for(int j = 0, f = byte_num; j < f; j += BLOCK_WRITE)
-            sock.write(file_arr.mid(j, BLOCK_WRITE));
+        QDataStream sendStream(&block, QIODevice::ReadWrite);
 
+        while(fileStream.readRawData(read_block, BLOCK_WRITE)){
+            if(firs_pack){
+                sendStream << quint32(0) << header << read_block;
+                sendStream.device()->seek(0);
+                sendStream << quint32(file.size());
+                firs_pack = false;
+            }else{
+                sendStream << read_block;
+            }
+
+            sock.write(block);
+            block.clear();
+            sendStream.device()->seek(0); // FIXME: это нужно? или при clear() стрим тоже перемещает указатель на начало?
+        }
+        delete [] read_block;
         return true;
     }
     file.close();

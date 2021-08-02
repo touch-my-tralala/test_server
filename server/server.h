@@ -13,6 +13,11 @@ class Server: public QObject
 {
     Q_OBJECT
 
+    enum JsonHeader{
+        Json_type  = 0,
+        File_type  = 1
+    };
+
 public:
     Server();
     ~Server() override;
@@ -61,7 +66,7 @@ private:
     //! \brief парсинг конфигурации из файла
     void ini_parse(QString fname);
     //! \brief отправка одному клиенту
-    void send_to_client(QTcpSocket &sock, const QJsonObject &jObj);
+    void send_to_client(QTcpSocket &sock, const QJsonObject &jObj, const quint8 &type);
     //! \brief обработка json сообщений
     void json_handler(const QJsonObject &jObj, const QHostAddress &clientIp, QTcpSocket &clientSocket);
     //! \brief резервирование ресурса за пользователем
@@ -79,7 +84,7 @@ private:
 private:
     qint64 maxBusyTime = 7200; // 2 часа
     const qint64 numReadByte = 32;
-    quint32 m_nextBlock = 0;
+    quint32 m_data_size = 0;
     quint16 m_port;
     quint8 m_max_users;
     bool reject_res_req = false;
@@ -93,9 +98,8 @@ private:
     QMap<QString, QJsonArray> m_grabRes; // имя пользователя - лист ресурсов, которые у него забрали
     QSet<QHostAddress>  m_blockIp;
     QDateTime startServTime;
-    QJsonDocument jDoc;
     QJsonParseError jsonErr;
-    QByteArray buff;
+    QByteArray m_buff;
 };
 
 #endif // SERVER_H

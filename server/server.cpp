@@ -150,7 +150,7 @@ void Server::removeUsr(QString name){
 
 
 void Server::ini_parse(QString fname){
-    sett = new QSettings(QDir::currentPath() + "/" + fname, QSettings::IniFormat);
+    sett = new QSettings(QDir::currentPath() + "/" + fname, QSettings::IniFormat, this);
     if(sett->isWritable()){
         sett->setIniCodec("UTF-8");
 
@@ -229,29 +229,55 @@ void Server::on_slotNewConnection(){
 
 void Server::on_slotReadClient(){
     QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender());
-    qint64 curByteNum = clientSocket->bytesAvailable();
-    if(curByteNum <= READ_BLOCK_SIZE){
-        buff.append(clientSocket->read(curByteNum));
-    }else{
-        for(int i=0; i<=curByteNum/READ_BLOCK_SIZE; i=i+READ_BLOCK_SIZE){ // FIXME:: так работать не будет
-            buff.append( clientSocket->read(READ_BLOCK_SIZE) );
-        }
+    QDataStream readStream(clientSocket);
+    if(!m_data_size){
+        qint32 header_size = sizeof(quint32);
+        if(clientSocket->bytesAvailable() < header_size)
+            return;
+        readStream >> m_data_size;
     }
 
-    if(buff.size() > 1048576){
-        emit signalLogEvent("ОШИБКА → Буфер превышает 1 Мб.");
-        buff.clear();
+    if(clientSocket->bytesAvailable() < m_data_size)
         return;
+
+    quint8 byte;
+    for(quint32 i = 0; i < m_data_size; i++){
+        readStream >> byte;
+        m_buff.append(byte);
     }
 
-    jDoc = QJsonDocument::fromJson(buff, &jsonErr);
+    auto jDoc = QJsonDocument::fromJson(m_buff, &jsonErr);
     if(jsonErr.error == QJsonParseError::NoError){
         auto address = clientSocket->peerAddress();
         json_handler(jDoc.object(), address, *clientSocket);
-        buff.clear();
+        m_buff.clear();
+        m_data_size = 0;
+    }else
+        emit signalLogEvent("ОШИБКА → Ошибка json-формата " + jsonErr.errorString() + ".");
+
+    /*qint64 curByteNum = clientSocket->bytesAvailable();
+    if(curByteNum <= READ_BLOCK_SIZE){
+        m_buff.append(clientSocket->read(curByteNum));
+    }else{
+        for(int i=0; i<=curByteNum/READ_BLOCK_SIZE; i=i+READ_BLOCK_SIZE){ // FIXME:: так работать не будет
+            m_buff.append( clientSocket->read(READ_BLOCK_SIZE) );
+        }
+    }
+
+    if(m_buff.size() > 1048576){
+        emit signalLogEvent("ОШИБКА → Буфер превышает 1 Мб.");
+        m_buff.clear();
+        return;
+    }
+
+    jDoc = QJsonDocument::fromJson(m_buff, &jsonErr);
+    if(jsonErr.error == QJsonParseError::NoError){
+        auto address = clientSocket->peerAddress();
+        json_handler(jDoc.object(), address, *clientSocket);
+        m_buff.clear();
     }else{
         emit signalLogEvent("ОШИБКА → Ошибка json-формата " + jsonErr.errorString() + ".");
-    }
+    }*/
 }
 
 
@@ -269,7 +295,7 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
         QJsonObject jObj({
                          {KEYS::Json().type, KEYS::Json().connect_fail}
                          });
-        send_to_client(clientSocket, jObj);
+        send_to_client(clientSocket, jObj, Json_type);
         clientSocket.disconnectFromHost();
         emit signalLogEvent("Server → IP клиента " + clientIp.toString() + " находися в бан листе до конца сессиий сервера.");
     }
@@ -290,7 +316,7 @@ void Server::json_handler(const QJsonObject &jObj, const QHostAddress &clientIp,
         QJsonObject jObj({
                          {KEYS::Json().type, KEYS::Json().connect_fail}
                          });
-        send_to_client(clientSocket, jObj);
+        send_to_client(clientSocket, jObj, Json_type);
         clientSocket.abort();
         emit signalLogEvent("Server → Имя пользователя " + jObj[KEYS::Json().user_name].toString() + " не является разрешенным");
         return;
@@ -327,7 +353,7 @@ void Server::new_client_autorization(QTcpSocket &sock, const QString &newUsrName
     QJsonObject jObj({{KEYS::Json().type, KEYS::Json().authorization},
                       {KEYS::Json().resources, resources}
                      });
-    send_to_client(sock, jObj);
+    send_to_client(sock, jObj, Json_type);
 }
 
 
@@ -385,7 +411,7 @@ void Server::res_req_take(const QJsonObject &jObj)
         QJsonObject jobj({{KEYS::Json().type, KEYS::Json().grab_res},
                           {KEYS::Json().resources, i.value()}
                          });
-        send_to_client(*m_userList[i.key()].first, jobj);
+        send_to_client(*m_userList[i.key()].first, jobj, Json_type);
     }
 
 
@@ -393,7 +419,7 @@ void Server::res_req_take(const QJsonObject &jObj)
                      {KEYS::Json().action, KEYS::Json().take},
                      {KEYS::Json().resources, arr}
                     });
-    send_to_client(*m_userList[usr_name].first, obj);
+    send_to_client(*m_userList[usr_name].first, obj, Json_type);
 }
 
 
@@ -427,17 +453,7 @@ void Server::res_req_free(const QJsonObject &jObj){
                      {KEYS::Json().action, KEYS::Json().drop},
                      {KEYS::Json().resources, arr}
                      });
-    send_to_client(*m_userList[usr_name].first, obj);
-}
-
-
-void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj){
-    if(sock.state() == QAbstractSocket::ConnectedState){
-        QJsonDocument jsonDoc(jObj);
-        sock.write(jsonDoc.toJson(QJsonDocument::Compact));
-    }else{
-        emit signalLogEvent("ОШИБКА → Сокет c IP -" + sock.peerAddress().toString() + " не подключен.");
-    }
+    send_to_client(*m_userList[usr_name].first, obj, Json_type);
 }
 
 //FIMXE: это надо сделать через ивент луп наверное
@@ -445,7 +461,9 @@ void Server::update_req_handle(QTcpSocket &sock, const QJsonObject &jObj){
     auto file_name = jObj[KEYS::Updater().file_name].toString();
     auto file_version = jObj[KEYS::Updater().file_version].toString();
 
-    bool update_avalible = m_updater.sendFile( sock, {file_name, file_version} );
+    QByteArray header;
+    header.append(File_type);
+    bool update_avalible = m_updater.checkAndSendFile(sock, {file_name, file_version}, header);
 
     if(!update_avalible)
         emit signalLogEvent("ОШИБКА → Передача или открытие файла обновлений провалено.");
@@ -474,11 +492,36 @@ void Server::send_to_all_clients(){
                       {KEYS::Json().resources, resources}
                      });
 
-    QJsonDocument jsonDoc(jObj);
     for(auto i = m_userList.begin(); i != m_userList.end(); ++i){
         if(i->first && i->first->state() == QTcpSocket::ConnectedState )
-            i->first->write(jsonDoc.toJson(QJsonDocument::Compact));
+            send_to_client(*i->first, jObj, Json_type);
     }
+}
+
+void Server::send_to_client(QTcpSocket &sock, const QJsonObject &jObj, const quint8 &type)
+{
+    if(sock.state() == QAbstractSocket::ConnectedState){
+        qint32 header_size = sizeof(quint32) + sizeof(quint8);
+        QByteArray block;
+        QDataStream sendStream(&block, QIODevice::ReadWrite);
+        sendStream << quint32(0) << quint8(0) << QJsonDocument(jObj).toJson(QJsonDocument::Compact);
+        // Размер данных
+        sendStream.device()->seek(0);
+        sendStream << (quint32)(block.size() - header_size);
+        // Тип Json или File
+        sendStream.device()->seek(4);
+        sendStream << type;
+
+        sock.write(block);
+    }else
+        emit signalLogEvent("ОШИБКА → Сокет c IP -" + sock.peerAddress().toString() + " не подключен.");
+
+    /*if(sock.state() == QAbstractSocket::ConnectedState){
+        QJsonDocument jsonDoc(jObj);
+        sock.write(jsonDoc.toJson(QJsonDocument::Compact));
+    }else{
+        emit signalLogEvent("ОШИБКА → Сокет c IP -" + sock.peerAddress().toString() + " не подключен.");
+    }*/
 }
 
 void Server::write_to_config()
