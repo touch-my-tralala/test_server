@@ -1,18 +1,29 @@
 #ifndef AUTOUPDATER_H
 #define AUTOUPDATER_H
+
 #include <QTcpSocket>
 #include <QFile>
+#include <QDataStream>
 #include <QFileInfo>
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QDir>
-#include <QDataStream>
 
-#define BLOCK_WRITE 32768 //< количество байт для отправки
+#define BLOCK_DATA 32768 //< количество байт для отправки
+
 
 class AutoUpdater
 {
 public:
+    enum ApdaterInfo{
+        WaitData         = 0,
+        EndNameRead      = 1,
+        EndFileWriting   = 2,
+        FileOpenError    = 3,
+        ReadStreamError  = 4,
+        WriteStreamError = 5
+    };
+
     AutoUpdater();
     ~AutoUpdater();
 
@@ -27,8 +38,13 @@ public:
     //! \return true если путь существует.
     bool setUpdateFilePath(const QString &path);
     //! \brief Проверка необходимости обновлений файла.
-    //! \return true если версии не совпадают.
-    bool checkFileVersion(const QString &fileName);
+    //! \return true если версии не совпадают, false если совпадают или файла нет в списке.
+    bool checkNeedUpdate(const QPair<QString, QString>& file);
+    //! \brief Прием нового файла обновлений.
+    //! \param[readStream] поток для чтения данных.
+    //! \param[size] размер файла
+    //! \return true файл полностью принят, false файл принят не полностью.
+    int recvFile(QDataStream &readStream, const quint32 &size);
     //! \brief Проверка обновления и отправка нового файла при необходимости. Имеет заголовок 4 байта - размер файла, кастомный заголовок(при необходимости).
     //! \param[file] <имя файла, версия>.
     //! \param[header] кастомный заголовок, который необходимо добавить.
@@ -41,14 +57,21 @@ public:
     QString getUpdatesPath(){ return m_update_file_path; }
 
 private:
-    bool send(QTcpSocket &sock, const QString &fileName, const QByteArray& header);
-
+    //! \brief Отправка файла пользователю
+    bool send_file(QTcpSocket &sock, const QString &fileName, const QByteArray& header);
+    //! \brief Отправка имени файла пользователю
+    bool send_file_info(QTcpSocket &sock, const QString &fileName, const QByteArray& header);
 
 private:
+    char *m_read_block = nullptr;
+    QDataStream m_fileStream;
+    QFile m_wrFile;
+    quint64 m_cur_file_size;
     QString m_update_file_path = "";
+    QString m_cur_file_name;
+    QByteArray m_buff;
     // FIXME: переделать на контрольную сумму файла или что-то что уникально для файла и не заполнятся руками
     QMap<QString, QString> m_update_files; //< name, version>
-
 };
 
 #endif // AUTOUPDATER_H

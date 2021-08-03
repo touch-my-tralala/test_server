@@ -267,6 +267,7 @@ void Server::on_slotReadClient()
 {
     QTcpSocket* clientSocket = qobject_cast<QTcpSocket*>(sender());
     QDataStream readStream(clientSocket);
+    readStream.setVersion(QDataStream::Qt_4_8);
     if (!m_data_size)
     {
         qint32 header_size = sizeof(quint32);
@@ -547,6 +548,7 @@ void Server::send_to_client(QTcpSocket& sock, const QJsonObject& jObj, const qui
     {
         QByteArray  block;
         QDataStream sendStream(&block, QIODevice::ReadWrite);
+        sendStream.setVersion(QDataStream::Qt_4_8);
         sendStream << quint32(block.size()) << quint8(type) << QJsonDocument(jObj).toJson(QJsonDocument::Compact);
         sock.write(block);
     }

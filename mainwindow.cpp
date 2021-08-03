@@ -1,7 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
-// Прочитать про модели в qt. Может стоит сделать чекбокс через qdelegate.
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
