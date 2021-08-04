@@ -1,29 +1,10 @@
 #include "server.h"
 
-/* Что осталось доделать:
- * 2) время последней транзакции от клиента
-*/
-
 Server::Server()
 {
     Server::ini_parse("init.ini");
 
-    emit signalLogEvent("Server → Максимальное количество пользователей - " + QString::number(m_max_users) + ".");
-    m_server.setMaxPendingConnections(m_max_users);
-
-    if (!m_server.listen(QHostAddress::Any, m_port))
-    {
-        emit signalLogEvent("ОШИБКА → Прослушивание порта невозможно.");
-        return;
-    }
-    else
-        emit signalLogEvent("Server → порт - " + QString::number(m_port) + ".");
-
-    connect(&m_server, &QTcpServer::newConnection,
-            this, &Server::on_slotNewConnection);
-
-    startServTime = QDateTime::currentDateTime();
-    emit signalLogEvent("Server → Время старта: " + startServTime.toString("hh:mm:ss."));
+    init();
 }
 
 Server::~Server()
@@ -217,7 +198,7 @@ void Server::ini_parse(QString fname)
             if (m_updater.setUpdateFilePath(QDir::currentPath() + path))
             {
                 m_updates_path = path;
-                update_info_json();
+                updates_file_info();
             }
             else
                 emit signalLogEvent("ОШИБКА → путь к файлам обновления не найден. Path = " + path);
@@ -225,12 +206,30 @@ void Server::ini_parse(QString fname)
         sett->endGroup();
     }
     else
-    {
         emit signalLogEvent("ОШИБКА → ini файл в режиме read-only.");
-    }
+
 }
 
-void Server::update_info_json()
+void Server::init(){
+    m_server.setMaxPendingConnections(m_max_users);
+    emit signalLogEvent("Server → Максимальное количество пользователей " + QString::number(m_max_users));
+
+    if (!m_server.listen(QHostAddress::Any, m_port))
+    {
+        emit signalLogEvent("ОШИБКА → Прослушивание порта невозможно.");
+        return;
+    }
+    else
+        emit signalLogEvent("Server → порт - " + QString::number(m_port) + ".");
+
+    connect(&m_server, &QTcpServer::newConnection,
+            this, &Server::on_slotNewConnection);
+
+    startServTime = QDateTime::currentDateTime();
+    emit signalLogEvent("Server → Время старта: " + startServTime.toString("hh:mm:ss."));
+}
+
+void Server::updates_file_info()
 {
     QFile file(QDir::currentPath() + m_updates_path + "/" + "updates.json");
     file.open(QIODevice::ReadOnly | QIODevice::Text);
@@ -254,7 +253,7 @@ void Server::update_info_json()
 
 void Server::on_slotNewConnection()
 {
-    QTcpSocket* clientSocket = m_server.nextPendingConnection(); // FIXME эту хрень так оставить или надо удалять?
+    QTcpSocket* clientSocket = m_server.nextPendingConnection();
 
     connect(clientSocket, &QTcpSocket::disconnected,
             this, &Server::on_slotDisconnected);
@@ -266,41 +265,45 @@ void Server::on_slotReadClient()
 {
     QTcpSocket* clientSocket = qobject_cast<QTcpSocket*>(sender());
     QDataStream readStream(clientSocket);
-    readStream.setVersion(QDataStream::Qt_4_8);
-    if (!m_data_size)
-    {
-        qint32 header_size = sizeof(quint32);
-        if (clientSocket->bytesAvailable() < header_size)
+    readStream.setVersion(QDataStream::Qt_5_12);
+    while(!readStream.atEnd()){
+        if (!m_data_size)
+        {
+            qint32 header_size = sizeof(quint32);
+            if (clientSocket->bytesAvailable() < header_size)
+                return;
+            readStream >> m_data_size;
+        }
+
+        if (clientSocket->bytesAvailable() < m_data_size)
             return;
-        readStream >> m_data_size;
-    }
 
-    if (clientSocket->bytesAvailable() < m_data_size)
-        return;
+        quint8 byte;
+        for (quint32 i = 0; i < m_data_size; i++)
+        {
+            readStream >> byte;
+            m_buff.append(byte);
+        }
 
-    quint8 byte;
-    for (quint32 i = 0; i < m_data_size; i++)
-    {
-        readStream >> byte;
-        m_buff.append(byte);
-    }
+        auto jDoc = QJsonDocument::fromJson(m_buff, &jsonErr);
+        if (jsonErr.error == QJsonParseError::NoError)
+        {
+            auto address = clientSocket->peerAddress();
+            json_handler(jDoc.object(), address, *clientSocket);
+        }
+        else
+            emit signalLogEvent("ОШИБКА → Ошибка json-формата " + jsonErr.errorString() + ".");
 
-    auto jDoc = QJsonDocument::fromJson(m_buff, &jsonErr);
-    if (jsonErr.error == QJsonParseError::NoError)
-    {
-        auto address = clientSocket->peerAddress();
-        json_handler(jDoc.object(), address, *clientSocket);
         m_buff.clear();
         m_data_size = 0;
     }
-    else
-        emit signalLogEvent("ОШИБКА → Ошибка json-формата " + jsonErr.errorString() + ".");
 }
 
 void Server::on_slotDisconnected()
 {
     QTcpSocket* clientSocket = qobject_cast<QTcpSocket*>(sender());
-    clientSocket->abort();
+    if(clientSocket != nullptr)
+            clientSocket->abort();
     clientSocket->deleteLater();
 }
 
@@ -348,8 +351,8 @@ void Server::json_handler(const QJsonObject& jObj, const QHostAddress& clientIp,
     else if (jObj[KEYS::Json().action].toString() == KEYS::Json().drop)
         res_req_free(jObj);
 
-    // костыль, чтобы json строки не отправлялись одна за другой. Подробнее смотри в слоте.
-    QTimer::singleShot(100, this, &Server::send_to_all_clients);
+    // Широковещательная рассылка всем клиентам
+    send_to_all_clients();
 }
 
 // Первое подключение пользователя.
@@ -469,33 +472,23 @@ void Server::res_req_free(const QJsonObject& jObj)
     send_to_client(*m_userList[usr_name].first, obj, Json_type);
 }
 
-//FIMXE: это надо сделать через ивент луп наверное
 void Server::update_req_handle(QTcpSocket& sock, const QJsonObject& jObj)
 {
-    auto file_name    = jObj[KEYS::Updater().file_name].toString();
-    auto file_version = jObj[KEYS::Updater().file_version].toString();
+    auto jArr = jObj[KEYS::Updater().files].toArray();
 
+    QString file_name, file_version;
     QByteArray header;
     header.append(File_type);
-    bool update_avalible = m_updater.checkAndSendFile(sock, { file_name, file_version }, header);
-
-    if (!update_avalible)
-        emit signalLogEvent("ОШИБКА → Передача или открытие файла обновлений провалено.");
-    else
-        emit signalLogEvent("Server → "
-                            " Файл обновления " +
-                            file_name + " отправлен пользователю + " + sock.peerAddress().toString());
+    for(const auto &i : qAsConst(jArr)){
+        auto jObj = i.toObject();
+        file_name    = jObj[KEYS::Updater().file_name].toString();
+        file_version = jObj[KEYS::Updater().file_version].toString();
+        m_updater.checkAndSendFile(sock, { file_name, file_version }, header);
+    }
 }
 
-// Обновление данных о ресурсах/пользователях у всех клиентов. Наверное так делать не совсем верно.
 void Server::send_to_all_clients()
 {
-    // FIXME: мне кажется это не правильно. Но я не нашел более простого варианта, чтобы не засирать
-    // сеть запросами через интервалы времени или не городить костыли по собиранию
-    // json строки из недошедших байт на стороне клиента
-    // еще один вариант заснуть, но мне кажется это еще более не правильным.
-    // сейчас вызывается singleShot таймер на 100 мс.
-
     QJsonArray resources;
 
     for (auto i = m_resList.begin(); i != m_resList.end(); i++)
@@ -508,32 +501,23 @@ void Server::send_to_all_clients()
     QJsonObject jObj({ { KEYS::Json().type, KEYS::Json().broadcast },
                        { KEYS::Json().resources, resources } });
 
-    for (auto i = m_userList.begin(); i != m_userList.end(); ++i)
-    {
-        if (i->first && i->first->state() == QTcpSocket::ConnectedState)
+    for (auto i = m_userList.begin(); i != m_userList.end(); ++i){
+        if(i->first != nullptr)
             send_to_client(*i->first, jObj, Json_type);
     }
 }
 
 void Server::send_to_client(QTcpSocket& sock, const QJsonObject& jObj, const quint8& type)
 {
+
     if (sock.state() == QAbstractSocket::ConnectedState)
     {
-        QByteArray  block;
-        QDataStream sendStream(&block, QIODevice::ReadWrite);
-        sendStream.setVersion(QDataStream::Qt_4_8);
-        sendStream << quint32(block.size()) << quint8(type) << QJsonDocument(jObj).toJson(QJsonDocument::Compact);
-        sock.write(block);
+        QDataStream sendStream(&sock);
+        sendStream.setVersion(QDataStream::Qt_5_12);
+        sendStream << quint8(type) <<  QJsonDocument(jObj).toJson(QJsonDocument::Compact);
     }
     else
         emit signalLogEvent("ОШИБКА → Сокет c IP -" + sock.peerAddress().toString() + " не подключен.");
-
-    /*if(sock.state() == QAbstractSocket::ConnectedState){
-        QJsonDocument jsonDoc(jObj);
-        sock.write(jsonDoc.toJson(QJsonDocument::Compact));
-    }else{
-        emit signalLogEvent("ОШИБКА → Сокет c IP -" + sock.peerAddress().toString() + " не подключен.");
-    }*/
 }
 
 void Server::write_to_config()

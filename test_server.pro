@@ -24,8 +24,10 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     server/server.cpp \
+    table_model/restablewidget.cpp \
     table_model/resurstableviewmodel.cpp \
-    table_model/usertableviewmodel.cpp
+    table_model/usertableviewmodel.cpp \
+    table_model/usrtablewidget.cpp
 
 HEADERS += \
     autoupdater/autoupdater.h \
@@ -33,8 +35,10 @@ HEADERS += \
     mainwindow.h \
     server/keys.h \
     server/server.h \
+    table_model/restablewidget.h \
     table_model/resurstableviewmodel.h \
-    table_model/usertableviewmodel.h
+    table_model/usertableviewmodel.h \
+    table_model/usrtablewidget.h
 
 FORMS += \
     mainwindow.ui

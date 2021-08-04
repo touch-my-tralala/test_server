@@ -85,6 +85,13 @@ void UserTableViewModel::setChecked(const QModelIndex& index, bool val)
     m_users[index.row()][SELECTED] = val;
 }
 
+void UserTableViewModel::removeAllRows()
+{
+    beginRemoveRows(QModelIndex(), 0, m_users.size()-1);
+    m_users.clear();
+    endRemoveRows();
+}
+
 bool UserTableViewModel::appendUser(const QString& usrName)
 {
     for (auto& i : m_users)
@@ -99,6 +106,17 @@ bool UserTableViewModel::appendUser(const QString& usrName)
     m_users.append(user);
     endInsertRows();
     return true;
+}
+
+QStringList UserTableViewModel::getSelected()
+{
+    QStringList selectedList;
+    for (auto i = m_users.begin(); i != m_users.end(); i++)
+    {
+        if (i->value(SELECTED, false).toBool())
+            selectedList << i->value(NAME).toString();
+    }
+    return selectedList;
 }
 
 QStringList UserTableViewModel::removeSelected()
@@ -122,3 +140,4 @@ QStringList UserTableViewModel::removeSelected()
     }
     return rmvUsers;
 }
+

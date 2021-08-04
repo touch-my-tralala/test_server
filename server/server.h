@@ -68,6 +68,8 @@ private slots:
 private:
     //! \brief парсинг конфигурации из файла
     void ini_parse(QString fname);
+    //! \brief инициализация
+    void init();
     //! \brief отправка одному клиенту
     void send_to_client(QTcpSocket& sock, const QJsonObject& jObj, const quint8& type);
     //! \brief обработка json сообщений
@@ -80,7 +82,7 @@ private:
     //! \brief обработка запроса обновлений. Проверка необходимости и отправка файлов
     void update_req_handle(QTcpSocket& sock, const QJsonObject& jObj);
     //! \brief чтение списка файлов обновления и их версий
-    void update_info_json();
+    void updates_file_info();
     //! \brief запись данных в конфиг файл
     void write_to_config();
 

@@ -132,6 +132,13 @@ bool ResursTableViewModel::setTime(const QString& resName, const QString& resTim
     return false;
 }
 
+void ResursTableViewModel::removeAllRows()
+{
+    beginRemoveRows(QModelIndex(), 0, m_resurs.size()-1);
+    m_resurs.clear();
+    endRemoveRows();
+}
+
 QStringList ResursTableViewModel::removeSelected()
 {
     int         k = 0;

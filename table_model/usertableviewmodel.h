@@ -15,9 +15,11 @@ public:
     QVariant      headerData(int section, Qt::Orientation orientation, int role) const override;
     Qt::ItemFlags flags(const QModelIndex& index) const override;
 
+    void removeAllRows();
     bool appendUser(const QString& usrName);
 
 public slots:
+    QStringList getSelected();
     QStringList removeSelected();
 
 private:

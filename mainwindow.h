@@ -7,8 +7,8 @@
 
 #include "server/keys.h"
 #include "server/server.h"
-#include "table_model/resurstableviewmodel.h"
-#include "table_model/usertableviewmodel.h"
+#include "table_model/restablewidget.h"
+#include "table_model/usrtablewidget.h"
 #include "logger/loggerwidget.h"
 
 QT_BEGIN_NAMESPACE
@@ -23,7 +23,7 @@ class MainWindow : public QMainWindow
         ResInf(){}
         ~ResInf(){}
         QTime time;
-        QString currentUser = "Free";
+        QString currentUser = "-";
     };
 
 public:
@@ -48,9 +48,9 @@ private:
     Server server;
     QTimer timer;
     QDateTime work_time;
-    UserTableViewModel* m_usr_model;
-    ResursTableViewModel* m_res_model;
-    QMap<QString, ResInf> res_inf;
+    UsrTableWidget* m_usr_widget;
+    ResTableWidget* m_res_widget;
+    QMap<QString, ResInf> m_res_inf;
 
 };
 #endif // MAINWINDOW_H

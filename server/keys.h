@@ -42,6 +42,7 @@ public:
     }COMMON;
 
     static const struct Updater{
+        const QString files        = "files";
         const QString update_req   = "update_request";
         const QString file_name    = "file_name";
         const QString file_version = "version";

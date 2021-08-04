@@ -41,13 +41,11 @@ public:
     //! \return true если версии не совпадают, false если совпадают или файла нет в списке.
     bool checkNeedUpdate(const QPair<QString, QString>& file);
     //! \brief Прием нового файла обновлений.
-    //! \param[readStream] поток для чтения данных.
-    //! \param[size] размер файла
+    //! \param[readStream] поток для чтения данных. \param[size] размер файла
     //! \return true файл полностью принят, false файл принят не полностью.
     int recvFile(QDataStream& readStream, const quint32& size);
     //! \brief Проверка обновления и отправка нового файла при необходимости. Имеет заголовок 4 байта - размер файла, кастомный заголовок(при необходимости).
-    //! \param[file] <имя файла, версия>.
-    //! \param[header] кастомный заголовок, который необходимо добавить.
+    //! \param[file] <имя файла, версия>. \param[header] кастомный заголовок, который необходимо добавить.
     //! \return true файл успешно отправлен, false нет зарегистрированного файла с таким именем или обновление не требуется.
     bool checkAndSendFile(QTcpSocket& sock, const QPair<QString, QVariant>& file, const QByteArray& header);
     //! \brief Возвращает мапу зарегестрированных файлов

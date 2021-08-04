@@ -2,13 +2,12 @@
 
 AutoUpdater::AutoUpdater()
 {
-    m_fileStream.setVersion(QDataStream::Qt_4_8);
+    m_fileStream.setVersion(QDataStream::Qt_5_12);
 }
 
-AutoUpdater::~AutoUpdater()
-{
-    if (!m_read_block)
-        delete[] m_read_block;
+AutoUpdater::~AutoUpdater(){
+    if(!m_read_block)
+        delete [] m_read_block;
 }
 
 bool AutoUpdater::setUpdateFilePath(const QString& path)
@@ -35,9 +34,8 @@ bool AutoUpdater::addUpdateFile(const QPair<QString, QString>& file)
     return true;
 }
 
-bool AutoUpdater::checkNeedUpdate(const QPair<QString, QString>& file)
-{
-    if (m_update_files.contains(file.first))
+bool AutoUpdater::checkNeedUpdate(const QPair<QString, QString> &file){
+    if(m_update_files.contains(file.first))
         return (m_update_files[file.first] == file.second) ? false : true;
 
     return false;
@@ -49,9 +47,9 @@ bool AutoUpdater::checkAndSendFile(QTcpSocket& sock, const QPair<QString, QVaria
     auto file_version = static_cast<QString>(file.second.toString());
     if (m_update_files.contains(file_name) && m_update_files[file_name] != file_version)
     {
-        if (!send_file_info(sock, file_name, header))
+        if( !send_file_info(sock, file_name, header) )
             return false;
-        if (!send_file(sock, file_name, header))
+        if( !send_file(sock, file_name, header) )
             return false;
 
         return true;
@@ -63,12 +61,10 @@ bool AutoUpdater::checkAndSendFile(QTcpSocket& sock, const QPair<QString, QVaria
 // Сначала приходят данные [размер][user header][имя файла].
 // после этого открывается соответствующий файл для записи
 // затем приходят данные [размер][user header][файл]
-int AutoUpdater::recvFile(QDataStream& readStream, const quint32& size)
-{
-    if (!m_wrFile.isOpen())
-    {
+int AutoUpdater::recvFile(QDataStream &readStream, const quint32 &size){
+    if(!m_wrFile.isOpen()){
         m_cur_file_size = 0;
-        if (readStream.device()->bytesAvailable() < size)
+        if(readStream.device()->bytesAvailable() < size)
             return WaitData;
 
         //FIXME: потестить QString. Если в конструктор передать массив, который не полностью заполнен.
@@ -77,58 +73,57 @@ int AutoUpdater::recvFile(QDataStream& readStream, const quint32& size)
         readStream.readRawData(read_block, size);
         m_cur_file_name = QString(read_block);
         m_wrFile.setFileName(m_update_file_path + "/" + m_cur_file_name);
-        delete[] read_block;
+        delete [] read_block;
 
-        if (!m_wrFile.open(QIODevice::WriteOnly))
+        if(!m_wrFile.open(QIODevice::WriteOnly))
             return FileOpenError;
 
         m_fileStream.setDevice(&m_wrFile);
 
-        if (m_read_block != nullptr)
-            delete[] m_read_block;
+        if(m_read_block != nullptr)
+            delete [] m_read_block;
 
         m_read_block = new char[BLOCK_DATA];
 
         return EndNameRead;
     }
 
-    int  return_val = 0;
+
     auto bytes_read = readStream.readRawData(m_read_block, BLOCK_DATA);
 
-    if (bytes_read == -1)
-        return_val = ReadStreamError;
+    if(bytes_read == -1){
+        delete [] m_read_block;
+        return ReadStreamError;
+    }
 
     auto write_bytes = m_fileStream.writeRawData(m_read_block, bytes_read);
 
-    if (write_bytes == -1)
-        return_val = WriteStreamError;
+    if(write_bytes == -1){
+        delete [] m_read_block;
+        return WriteStreamError;
+    }
 
     m_cur_file_size += write_bytes;
-
-    if (m_cur_file_size == size)
-        return_val = EndFileWriting;
-
-    if (return_val == EndFileWriting || return_val == WriteStreamError || return_val == ReadStreamError)
-    {
+    if(m_cur_file_size == size){
         m_wrFile.close();
-        delete[] m_read_block;
-        return return_val;
+        delete [] m_read_block;
+        return EndFileWriting;
     }
 
     return WaitData;
 }
 
-bool AutoUpdater::send_file_info(QTcpSocket& sock, const QString& fileName, const QByteArray& header)
+bool AutoUpdater::send_file_info(QTcpSocket &sock, const QString &fileName, const QByteArray &header)
 {
     if (sock.state() != QTcpSocket::ConnectedState)
         return false;
 
-    QByteArray  block;
-    QDataStream sendStream(&block, QIODevice::ReadWrite);
-    sendStream.setVersion(QDataStream::Qt_4_8);
+    QDataStream sendStream(&sock);
+    sendStream.setVersion(QDataStream::Qt_5_12);
 
-    sendStream << quint32(fileName.toUtf8().size()) << header << fileName.toUtf8();
-    sock.write(block);
+    auto block = fileName.toUtf8();
+    // информация о размере строки добавляется автоматически перед строкой 4 байта. Хз как выключить
+    sendStream << header << block;
 
     return true;
 }
@@ -141,20 +136,20 @@ bool AutoUpdater::send_file(QTcpSocket& sock, const QString& fileName, const QBy
     QFile file(m_update_file_path + "/" + fileName);
     if (file.open(QIODevice::ReadOnly))
     {
-        bool        firs_pack = true;
+        bool        first_pack = true;
         QByteArray  block;
         QDataStream fileStream(&file);
         char*       read_block = new char[BLOCK_DATA];
 
         QDataStream sendStream(&block, QIODevice::ReadWrite);
-        sendStream.setVersion(QDataStream::Qt_4_8);
+        sendStream.setVersion(QDataStream::Qt_5_12);
 
         while (fileStream.readRawData(read_block, BLOCK_DATA))
         {
-            if (firs_pack)
+            if (first_pack)
             {
-                sendStream << quint32(file.size()) << header << read_block;
-                firs_pack = false;
+                sendStream << header << quint32(file.size()) << read_block;
+                first_pack = false;
             }
             else
             {

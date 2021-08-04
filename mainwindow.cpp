@@ -11,23 +11,20 @@ MainWindow::MainWindow(QWidget* parent)
     timer.setInterval(1000);
     connect(&timer, &QTimer::timeout, this, &MainWindow::time_out);
 
-    QStringList resList = server.getResList();
-    ui->tableViewRes->setModel(m_res_model = new ResursTableViewModel(this));
-    for (auto& i : resList)
-        m_res_model->appendRes(i);
+    m_res_widget = new ResTableWidget(this);
+    ui->resTableLayout->addWidget(m_res_widget);
 
-    ui->tableViewRes->resizeColumnsToContents();
-    ui->tableViewRes->setSelectionMode(QAbstractItemView::NoSelection);
-    ui->tableViewRes->setFocusPolicy(Qt::NoFocus);
+    m_usr_widget = new UsrTableWidget(this);
+    ui->usrTableLayout->addWidget(m_usr_widget);
+
+    QStringList resList = server.getResList();
+    for (auto& i : resList){
+        m_res_inf.insert(i, ResInf());
+    }
 
     QStringList usrList = server.getUserList();
-    ui->tableViewUsr->setModel(m_usr_model = new UserTableViewModel(this));
     for (auto& i : usrList)
-        m_usr_model->appendUser(i);
-
-    ui->tableViewUsr->resizeColumnsToContents();
-    ui->tableViewUsr->setSelectionMode(QAbstractItemView::NoSelection);
-    ui->tableViewUsr->setFocusPolicy(Qt::NoFocus);
+       m_usr_widget->appendUser(i);
 
     work_time   = server.getStartTime();
     qint64 days = work_time.daysTo(QDateTime::currentDateTime());
@@ -36,8 +33,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     logger_w = new LoggerWidget(this);
     ui->loggerLayout->addWidget(logger_w);
-    connect(&server, &Server::signalLogEvent,
-            logger_w, &LoggerWidget::output);
+    connect(&server, &Server::signalLogEvent, logger_w, &LoggerWidget::output);
 
     timer.start();
 }
@@ -70,16 +66,16 @@ void MainWindow::on_timeoutBtn_clicked()
 
 void MainWindow::time_out()
 {
-    for (auto i = res_inf.begin(); i != res_inf.end(); i++)
-    {
-        res_inf[i.key()].currentUser = server.getResUser(i.key());
-        m_res_model->setUser(i.key(), res_inf[i.key()].currentUser);
-        busyTime = server.getBusyResTime(i.key());
-        m_res_model->setTime(i.key(), QTime(0, 0, 0).addSecs(busyTime).toString("hh:mm:ss"));
+    qint32 secs;
+    for(auto i = m_res_inf.begin(); i != m_res_inf.end(); i++){
+        if(i->currentUser != "-"){
+            secs = server.getBusyResTime(i.key());
+            m_res_widget->updateBusyTime(i.key(), secs);
+        }
     }
 
-    qint64 days = work_time.daysTo(QDateTime::currentDateTime());
-    qint64 secs = work_time.time().secsTo(QTime::currentTime());
+    qint32 days = work_time.daysTo(QDateTime::currentDateTime());
+    secs = work_time.time().secsTo(QTime::currentTime());
     ui->workTime->setText("Время работы " + QString::number(days) + " дней " + QTime(0, 0, 0).addSecs(secs).toString("hh:mm:ss"));
 }
 
@@ -108,9 +104,7 @@ void MainWindow::on_tabWidget_currentChanged(int index)
         ui->lineEdit->setPlaceholderText("Type user name");
         QStringList usrList = server.getUserList();
         for (auto& j : usrList)
-        {
             m_usr_model->appendUser(j);
-        }
     }
 }
 
@@ -119,8 +113,10 @@ void MainWindow::on_pushButtonAdd_clicked()
     QString text = ui->lineEdit->text();
     if (ui->tabWidget->currentIndex() == 0)
     {
-        if (m_res_model->appendRes(text))
-            server.addNewRes(text); // FIXME изменить потом на строку
+        if (m_res_model->appendRes(text)){
+            server.addNewRes(text);
+            m_res_inf.insert(text, ResInf());
+        }
         ui->lineEdit->clear();
     }
 
@@ -141,8 +137,10 @@ void MainWindow::on_pushButtonRemove_clicked()
     if (ui->tabWidget->currentIndex() == 0)
     {
         rmvList = m_res_model->removeSelected();
-        for (auto& i : rmvList)
+        for (auto& i : rmvList){
             server.removeRes(i);
+            m_res_inf.remove(i);
+        }
     }
 
     if (ui->tabWidget->currentIndex() == 2)
