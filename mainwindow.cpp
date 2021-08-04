@@ -1,6 +1,6 @@
 #include "mainwindow.h"
-#include "ui_mainwindow.h"
 
+#include "ui_mainwindow.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -31,7 +31,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     work_time   = server.getStartTime();
     qint64 days = work_time.daysTo(QDateTime::currentDateTime());
-    qint64 secs = work_time.time().secsTo(QTime::currentTime());
+    qint32 secs = work_time.time().secsTo(QTime::currentTime());
     ui->workTime->setText("Время работы " + QString::number(days) + " дней " + QTime(0, 0, 0).addSecs(secs).toString("hh:mm:ss"));
 
     logger_w = new LoggerWidget(this);

@@ -34,7 +34,7 @@ Server::~Server()
         m_server.close();
 }
 
-void Server::setTimeOut(qint64 secs)
+void Server::setTimeOut(qint32 secs)
 {
     maxBusyTime = secs;
     emit signalLogEvent("Server → Тайм-аут " + QTime(0, 0, 0).addSecs(secs).toString() + " успешно установлен.");
@@ -116,7 +116,6 @@ const QDateTime& Server::getStartTime() const
 void Server::allResClear()
 {
     QJsonObject jObj;
-    QString     usrName;
     for (auto i = m_resList.begin(); i != m_resList.end(); i++)
     {
         if (i->first != KEYS::Common().no_user)
@@ -193,7 +192,7 @@ void Server::ini_parse(QString fname)
 
         sett->beginGroup(KEYS::Config().user_list);
         iniList = sett->childKeys();
-        for (auto i : iniList)
+        for (const auto& i : qAsConst(iniList))
         {
             auto name = sett->value(i, "no_data").toString();
             m_userList.insert(name, { nullptr, QTime(0, 0, 0) });
@@ -203,7 +202,7 @@ void Server::ini_parse(QString fname)
         // Инициализация списка ресурсов
         sett->beginGroup(KEYS::Config().resource_list);
         iniList = sett->childKeys();
-        for (auto i : iniList)
+        for (const auto& i : qAsConst(iniList))
         {
             auto name = sett->value(i, "no_data").toString().toLower();
             m_resList.insert(name, { KEYS::Common().no_user, QTime(0, 0, 0) });
@@ -244,7 +243,7 @@ void Server::update_info_json()
     QJsonArray    jArr = jDoc.object()["files"].toArray();
 
     QString file_name, version;
-    for (auto i : jArr)
+    for (const auto& i : qAsConst(jArr))
     {
         auto j    = i.toObject();
         file_name = j[KEYS::Updater().file_name].toString();
@@ -296,30 +295,6 @@ void Server::on_slotReadClient()
     }
     else
         emit signalLogEvent("ОШИБКА → Ошибка json-формата " + jsonErr.errorString() + ".");
-
-    /*qint64 curByteNum = clientSocket->bytesAvailable();
-    if(curByteNum <= READ_BLOCK_SIZE){
-        m_buff.append(clientSocket->read(curByteNum));
-    }else{
-        for(int i=0; i<=curByteNum/READ_BLOCK_SIZE; i=i+READ_BLOCK_SIZE){ // FIXME:: так работать не будет
-            m_buff.append( clientSocket->read(READ_BLOCK_SIZE) );
-        }
-    }
-
-    if(m_buff.size() > 1048576){
-        emit signalLogEvent("ОШИБКА → Буфер превышает 1 Мб.");
-        m_buff.clear();
-        return;
-    }
-
-    jDoc = QJsonDocument::fromJson(m_buff, &jsonErr);
-    if(jsonErr.error == QJsonParseError::NoError){
-        auto address = clientSocket->peerAddress();
-        json_handler(jDoc.object(), address, *clientSocket);
-        m_buff.clear();
-    }else{
-        emit signalLogEvent("ОШИБКА → Ошибка json-формата " + jsonErr.errorString() + ".");
-    }*/
 }
 
 void Server::on_slotDisconnected()
@@ -409,7 +384,7 @@ void Server::res_req_take(const QJsonObject& jObj)
     int  secs     = jObj[KEYS::Json().time].toInt();
     auto res_arr  = jObj[KEYS::Json().resources].toArray();
 
-    for (auto i : res_arr)
+    for (const auto& i : qAsConst(res_arr))
     {
         res_name = i.toString();
 
@@ -464,15 +439,13 @@ void Server::res_req_take(const QJsonObject& jObj)
 // Освобождение ресурсов
 void Server::res_req_free(const QJsonObject& jObj)
 {
-
-    QMap<QString, QJsonArray> grab_res;
-    QJsonArray                arr;
-    QString                   res_name, past_usr;
+    QJsonArray arr;
+    QString    res_name;
 
     auto usr_name = jObj[KEYS::Json().user_name].toString();
     auto res_arr  = jObj[KEYS::Json().resources].toArray();
 
-    for (auto i : res_arr)
+    for (const auto& i : qAsConst(res_arr))
     {
         res_name = i.toString();
 
