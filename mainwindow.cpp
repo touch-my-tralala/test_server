@@ -29,6 +29,20 @@ MainWindow::~MainWindow()
 void MainWindow::init()
 {
 
+    m_tray_icon = new QSystemTrayIcon(this);
+    m_tray_icon->setIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
+    auto menu        = new QMenu(this);
+    auto view_window = new QAction("Открыть", this);
+    auto quit_app    = new QAction("Выход", this);
+
+    connect(view_window, &QAction::triggered, this, &MainWindow::show);
+    connect(quit_app, &QAction::triggered, this, &MainWindow::close);
+    connect(m_tray_icon, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
+
+    menu->addAction(view_window);
+    menu->addAction(quit_app);
+    m_tray_icon->setContextMenu(menu);
+
     // Список ресурсов
     auto resList = server.getResList();
     for (const auto& i : qAsConst(resList))
@@ -56,6 +70,23 @@ void MainWindow::init()
     timer.setInterval(1000);
     connect(&timer, &QTimer::timeout, this, &MainWindow::time_out);
     timer.start();
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+
+    if (isVisible() && ui->tray_en->isChecked())
+    {
+        event->ignore();
+        this->hide();
+        m_tray_icon->show();
+        if (m_message_flag)
+        {
+            QSystemTrayIcon::MessageIcon icon = QSystemTrayIcon::MessageIcon(QSystemTrayIcon::Information);
+            m_tray_icon->showMessage("Tray Program", "Приложение свернуто в трей", icon, 2000);
+            m_message_flag = false;
+        }
+    }
 }
 
 void MainWindow::on_rejectConnCheckBox_stateChanged(int arg1)
@@ -186,5 +217,35 @@ void MainWindow::on_pushButton_clicked()
             out << h_dialog->getText();
             file.close();
         }
+    }
+}
+
+void MainWindow::on_changeAddress_triggered()
+{
+    QSharedPointer<HostInputDialog> h_dialog = QSharedPointer<HostInputDialog>(new HostInputDialog);
+    if (h_dialog->exec() == QDialog::Accepted)
+    {
+        auto port    = static_cast<quint16>(h_dialog->getPort().toInt());
+        server.changePort(port);
+    }
+}
+
+void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
+{
+    switch (reason)
+    {
+        case QSystemTrayIcon::DoubleClick:
+            if (!isVisible()){
+                this->show();
+                m_tray_icon->hide();
+            }else{
+                this->hide();
+                m_tray_icon->show();
+            }
+
+            break;
+
+        default:
+            break;
     }
 }

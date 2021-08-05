@@ -94,6 +94,23 @@ const QDateTime& Server::getStartTime() const
     return startServTime;
 }
 
+void Server::changePort(const int &port)
+{
+    if(m_server.isListening())
+        m_server.disconnect();
+
+    if (!m_server.listen(QHostAddress::Any, port))
+    {
+        emit signalLogEvent("ОШИБКА → Прослушивание порта невозможно.");
+        return;
+    }
+    else{
+        m_port = port;
+        emit signalLogEvent("Server → порт изменен на - " + QString::number(m_port) + ".");
+    }
+
+}
+
 void Server::allResClear()
 {
     QJsonObject jObj;

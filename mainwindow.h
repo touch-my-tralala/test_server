@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QSizePolicy>
 #include <QStandardItemModel>
+#include <QSystemTrayIcon>
 
 #include "logger/loggerwidget.h"
 #include "server/keys.h"
@@ -11,6 +12,7 @@
 #include "table_model/restablewidget.h"
 #include "table_model/usrtablewidget.h"
 #include "widgets/reportwidget.h"
+#include "widgets/hostinputdialog.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui
@@ -35,6 +37,9 @@ public:
     MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
+protected:
+    void closeEvent(QCloseEvent* event) override;
+
 private:
     void init();
 
@@ -48,12 +53,15 @@ private slots:
     void on_tabWidget_currentChanged(int index);
     void on_pushButtonAdd_clicked();
     void on_pushButtonRemove_clicked();
-
     void on_pushButton_clicked();
+    void on_changeAddress_triggered();
+    void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
 
 private:
     qint32                busyTime;
+    bool                  m_message_flag = true;
     Ui::MainWindow*       ui;
+    QSystemTrayIcon*      m_tray_icon;
     LoggerWidget*         logger_w;
     QDateTime             date_time;
     Server                server;

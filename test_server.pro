@@ -28,6 +28,7 @@ SOURCES += \
     table_model/resurstableviewmodel.cpp \
     table_model/usertableviewmodel.cpp \
     table_model/usrtablewidget.cpp \
+    widgets/hostinputdialog.cpp \
     widgets/reportwidget.cpp
 
 HEADERS += \
@@ -40,6 +41,7 @@ HEADERS += \
     table_model/resurstableviewmodel.h \
     table_model/usertableviewmodel.h \
     table_model/usrtablewidget.h \
+    widgets/hostinputdialog.h \
     widgets/reportwidget.h
 
 FORMS += \

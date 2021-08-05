@@ -42,6 +42,8 @@ public:
     qint32 getBusyResTime(QString resName);
     //! \brief получить время старта сервера
     const QDateTime& getStartTime() const;
+    //! \brief Переподключение по новому порту и адресу
+    void changePort(const int& port);
     //! \brief освободить все ресурсы
     void allResClear();
     //! \brief добовить новый ресурс

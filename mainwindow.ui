@@ -216,8 +216,41 @@
      <height>20</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuMenu">
+    <property name="title">
+     <string>Menu</string>
+    </property>
+    <widget class="QMenu" name="menu">
+     <property name="title">
+      <string>Служебные</string>
+     </property>
+     <addaction name="services"/>
+    </widget>
+    <addaction name="changeAddress"/>
+    <addaction name="tray_en"/>
+    <addaction name="menu"/>
+   </widget>
+   <addaction name="menuMenu"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <action name="changeAddress">
+   <property name="text">
+    <string>Сменить порт</string>
+   </property>
+  </action>
+  <action name="tray_en">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Сворачивать в трей</string>
+   </property>
+  </action>
+  <action name="services">
+   <property name="text">
+    <string>Отправить гуся</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>

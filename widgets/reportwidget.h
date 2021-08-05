@@ -5,7 +5,8 @@
 #include <QDialog>
 #include <QGridLayout>
 #include <QLabel>
-#include <QLineEdit>
+//#include <QLineEdit>
+#include <QTextEdit>
 #include <QPushButton>
 
 class ReportWidget : public QDialog
@@ -14,13 +15,10 @@ class ReportWidget : public QDialog
 public:
     ReportWidget(QWidget* parent = nullptr);
 
-    QString getText() { return m_text->text(); }
+    QString getText() { return m_text->toPlainText(); }
 
 private:
-    void bigMode(int state);
-
-private:
-    QLineEdit* m_text;
+    QTextEdit* m_text;
 };
 
 #endif // REPORTWIDGET_H
