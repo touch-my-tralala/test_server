@@ -8,8 +8,6 @@ MainWindow::MainWindow(QWidget* parent)
 {
     ui->setupUi(this);
     setWindowTitle("BPOS tracker server");
-    timer.setInterval(1000);
-    connect(&timer, &QTimer::timeout, this, &MainWindow::time_out);
 
     m_res_widget = new ResTableWidget(this);
     ui->resTableLayout->addWidget(m_res_widget);
@@ -17,30 +15,44 @@ MainWindow::MainWindow(QWidget* parent)
     m_usr_widget = new UsrTableWidget(this);
     ui->usrTableLayout->addWidget(m_usr_widget);
 
-    QStringList resList = server.getResList();
-    for (auto& i : resList){
-        m_res_inf.insert(i, ResInf());
-    }
-
-    QStringList usrList = server.getUserList();
-    for (auto& i : usrList)
-       m_usr_widget->appendUser(i);
-
-    work_time   = server.getStartTime();
-    qint64 days = work_time.daysTo(QDateTime::currentDateTime());
-    qint32 secs = work_time.time().secsTo(QTime::currentTime());
-    ui->workTime->setText("Время работы " + QString::number(days) + " дней " + QTime(0, 0, 0).addSecs(secs).toString("hh:mm:ss"));
-
     logger_w = new LoggerWidget(this);
     ui->loggerLayout->addWidget(logger_w);
-    connect(&server, &Server::signalLogEvent, logger_w, &LoggerWidget::output);
 
-    timer.start();
+    init();
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::init()
+{
+
+    // Список ресурсов
+    auto resList = server.getResList();
+    for (const auto& i : qAsConst(resList))
+        m_res_inf.insert(i, ResInf());
+
+    // Список разрешенных пользователей
+    auto usrList = server.getUserList();
+    for (const auto& i : qAsConst(usrList))
+        m_usr_widget->appendUser(i);
+
+    // Время работы
+    work_time   = server.getStartTime();
+    qint64 days = work_time.daysTo(QDateTime::currentDateTime());
+    qint32 secs = work_time.time().secsTo(QTime::currentTime());
+    ui->workTime->setText("Время работы " + QString::number(days) + " дней " + QTime(0, 0, 0).addSecs(secs).toString("hh:mm:ss"));
+
+    // Сигналы от сервера
+    connect(&server, &Server::signalLogEvent, logger_w, &LoggerWidget::output);
+    connect(&server, &Server::resOwnerChenge, this, &MainWindow::update_res_info);
+
+    // Таймер обновление времени в таблице на 1 секунду
+    timer.setInterval(1000);
+    connect(&timer, &QTimer::timeout, this, &MainWindow::time_out);
+    timer.start();
 }
 
 void MainWindow::on_rejectConnCheckBox_stateChanged(int arg1)
@@ -60,23 +72,38 @@ void MainWindow::on_clearAllBtn_clicked()
 
 void MainWindow::on_timeoutBtn_clicked()
 {
-    qint64 sec = QTime(0, 0, 0).secsTo(ui->timeEdit->time());
+    qint32 sec = QTime(0, 0, 0).secsTo(ui->timeEdit->time());
     server.setTimeOut(sec);
 }
 
 void MainWindow::time_out()
 {
-    qint32 secs;
-    for(auto i = m_res_inf.begin(); i != m_res_inf.end(); i++){
-        if(i->currentUser != "-"){
-            secs = server.getBusyResTime(i.key());
+    qint32 secs, busyTime;
+    for (auto i = m_res_inf.begin(); i != m_res_inf.end(); i++)
+    {
+        if (i->currentUser != "-")
+        {
+            busyTime = server.getBusyResTime(i.key());
+            secs     = QTime(0, 0, 0).addSecs(busyTime).secsTo(QTime::currentTime());
             m_res_widget->updateBusyTime(i.key(), secs);
         }
     }
 
-    qint32 days = work_time.daysTo(QDateTime::currentDateTime());
-    secs = work_time.time().secsTo(QTime::currentTime());
+    qint32 days = static_cast<qint32>(work_time.daysTo(QDateTime::currentDateTime()));
+    secs        = work_time.time().secsTo(QTime::currentTime());
     ui->workTime->setText("Время работы " + QString::number(days) + " дней " + QTime(0, 0, 0).addSecs(secs).toString("hh:mm:ss"));
+}
+
+void MainWindow::update_res_info()
+{
+    for (auto i = m_res_inf.begin(), e = m_res_inf.end(); i != e; i++)
+    {
+        auto cur_usr = server.getResUser(i.key());
+        m_res_widget->setUser(i.key(), cur_usr);
+        m_res_widget->setTime(i.key(), "00:00:00");
+        i.value().currentUser = cur_usr;
+        i.value().time        = QTime(0, 0, 0);
+    }
 }
 
 void MainWindow::on_tabWidget_currentChanged(int index)
@@ -102,42 +129,35 @@ void MainWindow::on_tabWidget_currentChanged(int index)
     {
         ui->lineEdit->clear();
         ui->lineEdit->setPlaceholderText("Type user name");
-        QStringList usrList = server.getUserList();
-        for (auto& j : usrList)
-            m_usr_model->appendUser(j);
     }
 }
 
 void MainWindow::on_pushButtonAdd_clicked()
 {
     QString text = ui->lineEdit->text();
+
     if (ui->tabWidget->currentIndex() == 0)
     {
-        if (m_res_model->appendRes(text)){
-            server.addNewRes(text);
-            m_res_inf.insert(text, ResInf());
-        }
-        ui->lineEdit->clear();
+        m_res_widget->addResource(text);
+        server.addNewRes(text);
+        m_res_inf.insert(text, ResInf());
     }
 
     if (ui->tabWidget->currentIndex() == 2)
     {
-        bool answ = m_usr_model->appendUser(text);
-        if (answ)
-        {
-            server.addNewUsrName(ui->lineEdit->text().toLower());
-        }
-        ui->lineEdit->clear();
+        m_usr_widget->appendUser(text);
+        server.addNewUsrName(text);
     }
+    ui->lineEdit->clear();
 }
 
 void MainWindow::on_pushButtonRemove_clicked()
 {
-    QStringList rmvList;
     if (ui->tabWidget->currentIndex() == 0)
     {
-        rmvList = m_res_model->removeSelected();
-        for (auto& i : rmvList){
+        auto rmvList = m_res_widget->removeSelected();
+        for (const auto& i : qAsConst(rmvList))
+        {
             server.removeRes(i);
             m_res_inf.remove(i);
         }
@@ -145,7 +165,7 @@ void MainWindow::on_pushButtonRemove_clicked()
 
     if (ui->tabWidget->currentIndex() == 2)
     {
-        rmvList = m_usr_model->removeSelected();
+        auto rmvList = m_usr_widget->removeSelected();
         for (auto& i : rmvList)
             server.removeUsr(i);
     }

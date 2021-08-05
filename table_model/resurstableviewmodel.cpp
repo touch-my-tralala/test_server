@@ -45,7 +45,8 @@ QVariant ResursTableViewModel::data(const QModelIndex& index, int role) const
 {
     if (index.isValid() && !(m_resurs.count() <= index.row()))
     {
-        if (index.column() == SELECTED && role == Qt::CheckStateRole){
+        if (index.column() == SELECTED && role == Qt::CheckStateRole)
+        {
             return m_resurs[index.row()][SELECTED].toBool() ? Qt::Checked : Qt::Unchecked;
         }
 
@@ -97,9 +98,9 @@ bool ResursTableViewModel::appendRes(const QString& resName)
     }
     ResData resurs;
     resurs[NAME] = resName;
-    resurs[USER] = "free";
+    resurs[USER] = "-";
     resurs[TIME] = "00:00:00";
-    auto row         = m_resurs.count();
+    auto row     = m_resurs.count();
     beginInsertRows(QModelIndex(), row, row);
     m_resurs.append(resurs);
     endInsertRows();
@@ -134,7 +135,7 @@ bool ResursTableViewModel::setTime(const QString& resName, const QString& resTim
 
 void ResursTableViewModel::removeAllRows()
 {
-    beginRemoveRows(QModelIndex(), 0, m_resurs.size()-1);
+    beginRemoveRows(QModelIndex(), 0, m_resurs.size() - 1);
     m_resurs.clear();
     endRemoveRows();
 }

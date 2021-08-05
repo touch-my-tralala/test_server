@@ -207,10 +207,10 @@ void Server::ini_parse(QString fname)
     }
     else
         emit signalLogEvent("ОШИБКА → ini файл в режиме read-only.");
-
 }
 
-void Server::init(){
+void Server::init()
+{
     m_server.setMaxPendingConnections(m_max_users);
     emit signalLogEvent("Server → Максимальное количество пользователей " + QString::number(m_max_users));
 
@@ -266,7 +266,8 @@ void Server::on_slotReadClient()
     QTcpSocket* clientSocket = qobject_cast<QTcpSocket*>(sender());
     QDataStream readStream(clientSocket);
     readStream.setVersion(QDataStream::Qt_5_12);
-    while(!readStream.atEnd()){
+    while (!readStream.atEnd())
+    {
         if (!m_data_size)
         {
             qint32 header_size = sizeof(quint32);
@@ -302,8 +303,8 @@ void Server::on_slotReadClient()
 void Server::on_slotDisconnected()
 {
     QTcpSocket* clientSocket = qobject_cast<QTcpSocket*>(sender());
-    if(clientSocket != nullptr)
-            clientSocket->abort();
+    if (clientSocket != nullptr)
+        clientSocket->abort();
     clientSocket->deleteLater();
 }
 
@@ -406,6 +407,8 @@ void Server::res_req_take(const QJsonObject& jObj)
             arr.push_back(QJsonObject({ { KEYS::Json().res_name, res_name },
                                         { KEYS::Json().status, true } }));
 
+            emit resOwnerChenge();
+
             // Составление списка пользователей у которых забрали ресурсы.
             if (diffTime > maxBusyTime && past_usr != KEYS::Common().no_user)
             {
@@ -458,6 +461,7 @@ void Server::res_req_free(const QJsonObject& jObj)
             m_resList[res_name].second.setHMS(0, 0, 0);
             arr.push_back(QJsonObject({ { KEYS::Json().res_name, res_name },
                                         { KEYS::Json().status, true } }));
+            emit resOwnerChenge();
         }
         else
         {
@@ -476,11 +480,12 @@ void Server::update_req_handle(QTcpSocket& sock, const QJsonObject& jObj)
 {
     auto jArr = jObj[KEYS::Updater().files].toArray();
 
-    QString file_name, file_version;
+    QString    file_name, file_version;
     QByteArray header;
     header.append(File_type);
-    for(const auto &i : qAsConst(jArr)){
-        auto jObj = i.toObject();
+    for (const auto& i : qAsConst(jArr))
+    {
+        auto jObj    = i.toObject();
         file_name    = jObj[KEYS::Updater().file_name].toString();
         file_version = jObj[KEYS::Updater().file_version].toString();
         m_updater.checkAndSendFile(sock, { file_name, file_version }, header);
@@ -501,8 +506,9 @@ void Server::send_to_all_clients()
     QJsonObject jObj({ { KEYS::Json().type, KEYS::Json().broadcast },
                        { KEYS::Json().resources, resources } });
 
-    for (auto i = m_userList.begin(); i != m_userList.end(); ++i){
-        if(i->first != nullptr)
+    for (auto i = m_userList.begin(); i != m_userList.end(); ++i)
+    {
+        if (i->first != nullptr)
             send_to_client(*i->first, jObj, Json_type);
     }
 }
@@ -514,7 +520,7 @@ void Server::send_to_client(QTcpSocket& sock, const QJsonObject& jObj, const qui
     {
         QDataStream sendStream(&sock);
         sendStream.setVersion(QDataStream::Qt_5_12);
-        sendStream << quint8(type) <<  QJsonDocument(jObj).toJson(QJsonDocument::Compact);
+        sendStream << quint8(type) << QJsonDocument(jObj).toJson(QJsonDocument::Compact);
     }
     else
         emit signalLogEvent("ОШИБКА → Сокет c IP -" + sock.peerAddress().toString() + " не подключен.");

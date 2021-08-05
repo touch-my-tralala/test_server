@@ -55,8 +55,10 @@ public:
     void removeUsr(QString name);
 
 signals:
-    //! сигнал для логгера
+    //! \brief сигнал для логгера
     void signalLogEvent(QString s);
+    //! \brief Излучается всякий раз, когда у какого-ибо ресурса меняется пользователь
+    void resOwnerChenge();
 
 private slots:
     void on_slotNewConnection();
