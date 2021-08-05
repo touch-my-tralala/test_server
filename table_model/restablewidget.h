@@ -20,7 +20,7 @@ public:
     QStringList removeSelected() { return m_model->removeSelected(); }
     //! \brief Изменение времени текущего использования ресурса
     //! \param[secs] время в секундах, прошедшее с момента занятия ресурса
-    void updateBusyTime(const QString& resName, const int& secs);
+    void updateBusyTime(const QString& resName, const QString& time) { m_model->setTime(resName, time); }
     void setTime(const QString& resName, const QString& time) { m_model->setTime(resName, time); }
     void setUser(const QString& resName, const QString& usrName) { m_model->setUser(resName, usrName); }
 

@@ -10,6 +10,7 @@
 #include "server/server.h"
 #include "table_model/restablewidget.h"
 #include "table_model/usrtablewidget.h"
+#include "widgets/reportwidget.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui
@@ -47,6 +48,8 @@ private slots:
     void on_tabWidget_currentChanged(int index);
     void on_pushButtonAdd_clicked();
     void on_pushButtonRemove_clicked();
+
+    void on_pushButton_clicked();
 
 private:
     qint32                busyTime;

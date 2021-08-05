@@ -32,7 +32,10 @@ void MainWindow::init()
     // Список ресурсов
     auto resList = server.getResList();
     for (const auto& i : qAsConst(resList))
+    {
         m_res_inf.insert(i, ResInf());
+        m_res_widget->addResource(i);
+    }
 
     // Список разрешенных пользователей
     auto usrList = server.getUserList();
@@ -83,9 +86,9 @@ void MainWindow::time_out()
     {
         if (i->currentUser != "-")
         {
-            busyTime = server.getBusyResTime(i.key());
-            secs     = QTime(0, 0, 0).addSecs(busyTime).secsTo(QTime::currentTime());
-            m_res_widget->updateBusyTime(i.key(), secs);
+            busyTime      = server.getBusyResTime(i.key());
+            auto usr_time = QTime(0, 0, 0).addSecs(busyTime);
+            m_res_widget->updateBusyTime(i.key(), usr_time.toString("hh:mm:ss"));
         }
     }
 
@@ -168,5 +171,20 @@ void MainWindow::on_pushButtonRemove_clicked()
         auto rmvList = m_usr_widget->removeSelected();
         for (auto& i : rmvList)
             server.removeUsr(i);
+    }
+}
+
+void MainWindow::on_pushButton_clicked()
+{
+    QSharedPointer<ReportWidget> h_dialog = QSharedPointer<ReportWidget>(new ReportWidget);
+    if (h_dialog->exec() == QDialog::Accepted)
+    {
+        QFile file("/reports/reports.txt");
+        if (file.open(QIODevice::WriteOnly | QIODevice::Append))
+        {
+            QTextStream out(&file);
+            out << h_dialog->getText();
+            file.close();
+        }
     }
 }

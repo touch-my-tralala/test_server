@@ -27,7 +27,8 @@ SOURCES += \
     table_model/restablewidget.cpp \
     table_model/resurstableviewmodel.cpp \
     table_model/usertableviewmodel.cpp \
-    table_model/usrtablewidget.cpp
+    table_model/usrtablewidget.cpp \
+    widgets/reportwidget.cpp
 
 HEADERS += \
     autoupdater/autoupdater.h \
@@ -38,7 +39,8 @@ HEADERS += \
     table_model/restablewidget.h \
     table_model/resurstableviewmodel.h \
     table_model/usertableviewmodel.h \
-    table_model/usrtablewidget.h
+    table_model/usrtablewidget.h \
+    widgets/reportwidget.h
 
 FORMS += \
     mainwindow.ui
