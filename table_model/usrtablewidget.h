@@ -11,9 +11,8 @@ class UsrTableWidget : public QTableView
 {
 public:
     UsrTableWidget(QWidget* parent = nullptr);
-    QStringList removeUser() { return m_model->removeSelected(); }
-    bool        appendUser(const QString& name) { return m_model->appendUser(name); }
-    QStringList removeSelected() { return m_model->removeSelected(); }
+    bool        appendUser(const QString& name);
+    QStringList removeSelected();
 
 private:
     UserTableViewModel* m_model;

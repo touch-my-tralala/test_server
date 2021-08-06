@@ -352,7 +352,7 @@ void Server::json_handler(const QJsonObject& jObj, const QHostAddress& clientIp,
         return;
     }
 
-    if (jObj.contains(KEYS::Json().goose))
+    if (jObj[KEYS::Json().type] == KEYS::Json().goose)
     {
         send_goose(jObj);
         return;

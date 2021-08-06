@@ -11,9 +11,9 @@ public:
         const QString server_settings = "SERVER_SETTINGS";
         const QString resource_list   = "RESOURCE_LIST";
         const QString user_list       = "USER_LIST";
+        const QString updates         = "UPDATES";
         const QString port            = "port";
         const QString max_user        = "max_user";
-        const QString updates         = "UPDATES";
         const QString update_path     = "update_path";
     } CONFIG;
 

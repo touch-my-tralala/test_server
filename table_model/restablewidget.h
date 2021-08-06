@@ -14,10 +14,10 @@ class ResTableWidget : public QTableView
 public:
     ResTableWidget(QWidget* parent = nullptr);
     //! \brief Добавление ресурса в таблицу
-    bool addResource(const QString& name) { return m_model->appendRes(name); }
+    bool addResource(const QString& name);
     //! \brief Удаление отмеченных ресурсов
     //! \return Список имен удаленных ресурсов
-    QStringList removeSelected() { return m_model->removeSelected(); }
+    QStringList removeSelected();
     //! \brief Изменение времени текущего использования ресурса
     //! \param[secs] время в секундах, прошедшее с момента занятия ресурса
     void updateBusyTime(const QString& resName, const QString& time) { m_model->setTime(resName, time); }
