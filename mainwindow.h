@@ -11,8 +11,8 @@
 #include "server/server.h"
 #include "table_model/restablewidget.h"
 #include "table_model/usrtablewidget.h"
-#include "widgets/reportwidget.h"
 #include "widgets/hostinputdialog.h"
+#include "widgets/reportwidget.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui

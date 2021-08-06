@@ -225,7 +225,7 @@ void MainWindow::on_changeAddress_triggered()
     QSharedPointer<HostInputDialog> h_dialog = QSharedPointer<HostInputDialog>(new HostInputDialog);
     if (h_dialog->exec() == QDialog::Accepted)
     {
-        auto port    = static_cast<quint16>(h_dialog->getPort().toInt());
+        auto port = static_cast<quint16>(h_dialog->getPort().toInt());
         server.changePort(port);
     }
 }
@@ -235,10 +235,13 @@ void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
     switch (reason)
     {
         case QSystemTrayIcon::DoubleClick:
-            if (!isVisible()){
+            if (!isVisible())
+            {
                 this->show();
                 m_tray_icon->hide();
-            }else{
+            }
+            else
+            {
                 this->hide();
                 m_tray_icon->show();
             }

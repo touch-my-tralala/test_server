@@ -55,7 +55,6 @@ public:
     void removeRes(QString resName);
     //! \brief удаления пользователя из списка разрешенных
     void removeUsr(QString name);
-
 signals:
     //! \brief сигнал для логгера
     void signalLogEvent(QString s);
@@ -89,6 +88,8 @@ private:
     void updates_file_info();
     //! \brief запись данных в конфиг файл
     void write_to_config();
+    //! \brief метода для отправки гуся
+    void send_goose(const QJsonObject& obj);
 
 private:
     qint64                                   maxBusyTime = 7200; // 2 часа

@@ -94,9 +94,9 @@ const QDateTime& Server::getStartTime() const
     return startServTime;
 }
 
-void Server::changePort(const int &port)
+void Server::changePort(const int& port)
 {
-    if(m_server.isListening())
+    if (m_server.isListening())
         m_server.disconnect();
 
     if (!m_server.listen(QHostAddress::Any, port))
@@ -104,11 +104,11 @@ void Server::changePort(const int &port)
         emit signalLogEvent("ОШИБКА → Прослушивание порта невозможно.");
         return;
     }
-    else{
+    else
+    {
         m_port = port;
         emit signalLogEvent("Server → порт изменен на - " + QString::number(m_port) + ".");
     }
-
 }
 
 void Server::allResClear()
@@ -170,6 +170,14 @@ void Server::removeUsr(QString name)
     }
     else
         emit signalLogEvent("ОШИБКА → Пользователя " + name + " нет в списке.");
+}
+
+void Server::send_goose(const QJsonObject& obj)
+{
+    auto name = obj[KEYS::Json().user_name].toString();
+
+    if (m_userList.contains(name))
+        send_to_client(*m_userList[name].first, obj, Json_type);
 }
 
 void Server::ini_parse(QString fname)
@@ -341,6 +349,12 @@ void Server::json_handler(const QJsonObject& jObj, const QHostAddress& clientIp,
     if (jObj.contains(KEYS::Updater().update_req))
     {
         update_req_handle(clientSocket, jObj);
+        return;
+    }
+
+    if (jObj.contains(KEYS::Json().goose))
+    {
+        send_goose(jObj);
         return;
     }
 
