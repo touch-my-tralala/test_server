@@ -177,7 +177,7 @@ void Server::send_goose(const QJsonObject& obj)
     auto name = obj[KEYS::Json().user_name].toString();
 
     if (m_userList.contains(name))
-        send_to_client(*m_userList[name].first, obj, Json_type);
+        send_to_client(*m_userList[name].first, obj);
 }
 
 void Server::ini_parse(QString fname)
@@ -214,21 +214,6 @@ void Server::ini_parse(QString fname)
             m_resList.insert(name, { KEYS::Common().no_user, QTime(0, 0, 0) });
         }
         sett->endGroup();
-
-        // Чтение пути к файлам обновлений
-        sett->beginGroup(KEYS::Config().updates);
-        if (sett->contains(KEYS::Config().update_path))
-        {
-            auto path = sett->value(KEYS::Config().update_path).toString();
-            if (m_updater.setUpdateFilePath(QDir::currentPath() + path))
-            {
-                m_updates_path = path;
-                updates_file_info();
-            }
-            else
-                emit signalLogEvent("ОШИБКА → путь к файлам обновления не найден. Path = " + path);
-        }
-        sett->endGroup();
     }
     else
         emit signalLogEvent("ОШИБКА → ini файл в режиме read-only.");
@@ -252,28 +237,6 @@ void Server::init()
 
     startServTime = QDateTime::currentDateTime();
     emit signalLogEvent("Server → Время старта: " + startServTime.toString("hh:mm:ss."));
-}
-
-void Server::updates_file_info()
-{
-    QFile file(QDir::currentPath() + m_updates_path + "/" + "updates.json");
-    file.open(QIODevice::ReadOnly | QIODevice::Text);
-    if (!file.isOpen())
-        return;
-    QString val = file.readAll();
-    file.close();
-
-    QJsonDocument jDoc = QJsonDocument::fromJson(val.toUtf8());
-    QJsonArray    jArr = jDoc.object()["files"].toArray();
-
-    QString file_name, version;
-    for (const auto& i : qAsConst(jArr))
-    {
-        auto j    = i.toObject();
-        file_name = j[KEYS::Updater().file_name].toString();
-        version   = j[KEYS::Updater().file_version].toString();
-        m_updater.addUpdateFile({ file_name, version });
-    }
 }
 
 void Server::on_slotNewConnection()
@@ -339,18 +302,11 @@ void Server::json_handler(const QJsonObject& jObj, const QHostAddress& clientIp,
     if (m_blockIp.contains(clientIp))
     {
         QJsonObject jObj({ { KEYS::Json().type, KEYS::Json().connect_fail } });
-        send_to_client(clientSocket, jObj, Json_type);
+        send_to_client(clientSocket, jObj);
         clientSocket.disconnectFromHost();
         emit signalLogEvent("Server → IP клиента " + clientIp.toString() + " находися в бан листе до конца сессиий сервера.");
     }
 
-    // Ответ на запрос обновлений
-    // TODO: запрос обновления после подключения пользователя. А не до основных действий
-    if (jObj.contains(KEYS::Updater().update_req))
-    {
-        update_req_handle(clientSocket, jObj);
-        return;
-    }
 
     if (jObj[KEYS::Json().type] == KEYS::Json().goose)
     {
@@ -364,7 +320,7 @@ void Server::json_handler(const QJsonObject& jObj, const QHostAddress& clientIp,
     {
         m_blockIp.insert(clientIp);
         QJsonObject jObj({ { KEYS::Json().type, KEYS::Json().connect_fail } });
-        send_to_client(clientSocket, jObj, Json_type);
+        send_to_client(clientSocket, jObj);
         clientSocket.abort();
         emit signalLogEvent("Server → Имя пользователя " + jObj[KEYS::Json().user_name].toString() + " не является разрешенным");
         return;
@@ -401,7 +357,7 @@ void Server::new_client_autorization(QTcpSocket& sock, const QString& newUsrName
     }
     QJsonObject jObj({ { KEYS::Json().type, KEYS::Json().authorization },
                        { KEYS::Json().resources, resources } });
-    send_to_client(sock, jObj, Json_type);
+    send_to_client(sock, jObj);
 }
 
 // Запрос ресурсов
@@ -464,13 +420,13 @@ void Server::res_req_take(const QJsonObject& jObj)
     {
         QJsonObject jobj({ { KEYS::Json().type, KEYS::Json().grab_res },
                            { KEYS::Json().resources, i.value() } });
-        send_to_client(*m_userList[i.key()].first, jobj, Json_type);
+        send_to_client(*m_userList[i.key()].first, jobj);
     }
 
     QJsonObject obj({ { KEYS::Json().type, KEYS::Json().request_responce },
                       { KEYS::Json().action, KEYS::Json().take },
                       { KEYS::Json().resources, arr } });
-    send_to_client(*m_userList[usr_name].first, obj, Json_type);
+    send_to_client(*m_userList[usr_name].first, obj);
 }
 
 // Освобождение ресурсов
@@ -504,24 +460,9 @@ void Server::res_req_free(const QJsonObject& jObj)
     QJsonObject obj({ { KEYS::Json().type, KEYS::Json().request_responce },
                       { KEYS::Json().action, KEYS::Json().drop },
                       { KEYS::Json().resources, arr } });
-    send_to_client(*m_userList[usr_name].first, obj, Json_type);
+    send_to_client(*m_userList[usr_name].first, obj);
 }
 
-void Server::update_req_handle(QTcpSocket& sock, const QJsonObject& jObj)
-{
-    auto jArr = jObj[KEYS::Updater().files].toArray();
-
-    QString    file_name, file_version;
-    QByteArray header;
-    header.append(File_type);
-    for (const auto& i : qAsConst(jArr))
-    {
-        auto jObj    = i.toObject();
-        file_name    = jObj[KEYS::Updater().file_name].toString();
-        file_version = jObj[KEYS::Updater().file_version].toString();
-        m_updater.checkAndSendFile(sock, { file_name, file_version }, header);
-    }
-}
 
 void Server::send_to_all_clients()
 {
@@ -540,18 +481,18 @@ void Server::send_to_all_clients()
     for (auto i = m_userList.begin(); i != m_userList.end(); ++i)
     {
         if (i->first != nullptr)
-            send_to_client(*i->first, jObj, Json_type);
+            send_to_client(*i->first, jObj);
     }
 }
 
-void Server::send_to_client(QTcpSocket& sock, const QJsonObject& jObj, const quint8& type)
+void Server::send_to_client(QTcpSocket& sock, const QJsonObject& jObj)
 {
 
     if (sock.state() == QAbstractSocket::ConnectedState)
     {
         QDataStream sendStream(&sock);
         sendStream.setVersion(QDataStream::Qt_5_12);
-        sendStream << quint8(type) << QJsonDocument(jObj).toJson(QJsonDocument::Compact);
+        sendStream << QJsonDocument(jObj).toJson(QJsonDocument::Compact);
     }
     else
         emit signalLogEvent("ОШИБКА → Сокет c IP -" + sock.peerAddress().toString() + " не подключен.");
@@ -582,9 +523,5 @@ void Server::write_to_config()
     sett->beginGroup(KEYS::Config().server_settings);
     sett->setValue(KEYS::Config().port, m_port);
     sett->setValue(KEYS::Config().max_user, m_max_users);
-    sett->endGroup();
-
-    sett->beginGroup(KEYS::Config().updates);
-    sett->setValue(KEYS::Config().update_path, m_updates_path);
     sett->endGroup();
 }

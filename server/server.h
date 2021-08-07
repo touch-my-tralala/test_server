@@ -7,19 +7,12 @@
 #include <QTcpSocket>
 #include <QtCore>
 
-#include "autoupdater/autoupdater.h"
 #include "keys.h"
 #define READ_BLOCK_SIZE 32768 // 32 кб
 
 class Server : public QObject
 {
     Q_OBJECT
-
-    enum JsonHeader
-    {
-        Json_type = 0,
-        File_type = 1
-    };
 
 public:
     Server();
@@ -74,7 +67,7 @@ private:
     //! \brief инициализация
     void init();
     //! \brief отправка одному клиенту
-    void send_to_client(QTcpSocket& sock, const QJsonObject& jObj, const quint8& type);
+    void send_to_client(QTcpSocket& sock, const QJsonObject& jObj);
     //! \brief обработка json сообщений
     void json_handler(const QJsonObject& jObj, const QHostAddress& clientIp, QTcpSocket& clientSocket);
     //! \brief резервирование ресурса за пользователем
@@ -101,7 +94,6 @@ private:
     QString                                  m_updates_path;
     QMutex                                   mutex;
     QTcpServer                               m_server;
-    AutoUpdater                              m_updater;
     QSettings*                               sett;       // FIXME: не очень понял в чем дело, но если сделать не как указатель и потом указать setPath(QSettings::IniFormat, QSettings::UserScope, path) то файл не читается.
     QMap<QString, QPair<QTcpSocket*, QTime>> m_userList; // FIXME можно без qsharedpointer
     QMap<QString, QPair<QString, QTime>>     m_resList;  // <имя ресурса, <пользователь, время>>

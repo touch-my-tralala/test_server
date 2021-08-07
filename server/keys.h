@@ -11,10 +11,8 @@ public:
         const QString server_settings = "SERVER_SETTINGS";
         const QString resource_list   = "RESOURCE_LIST";
         const QString user_list       = "USER_LIST";
-        const QString updates         = "UPDATES";
         const QString port            = "port";
         const QString max_user        = "max_user";
-        const QString update_path     = "update_path";
     } CONFIG;
 
     static const struct Json
@@ -46,14 +44,6 @@ public:
     {
         const QString no_user = "-";
     } COMMON;
-
-    static const struct Updater
-    {
-        const QString files        = "files";
-        const QString update_req   = "update_request";
-        const QString file_name    = "file_name";
-        const QString file_version = "version";
-    } UPDATER;
 };
 
 #endif // KEYS_H

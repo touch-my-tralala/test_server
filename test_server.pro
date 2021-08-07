@@ -19,7 +19,6 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-    autoupdater/autoupdater.cpp \
     logger/loggerwidget.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -32,7 +31,6 @@ SOURCES += \
     widgets/reportwidget.cpp
 
 HEADERS += \
-    autoupdater/autoupdater.h \
     logger/loggerwidget.h \
     mainwindow.h \
     server/keys.h \
